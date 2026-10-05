@@ -1,0 +1,32 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: legalflow-billing-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5439/billing_db}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:billing_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:billing_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs}
+
+legalflow:
+  billing:
+    processing-interval-ms: ${BILLING_PROCESSING_INTERVAL_MS:60000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,27 @@
+{
+  "name": "lawFirmId",
+  "description": "LegalFlow tenant identifier claim for resource-server authorization.",
+  "protocol": "openid-connect",
+  "attributes": {
+    "include.in.token.scope": "true",
+    "display.on.consent.screen": "false"
+  },
+  "protocolMappers": [
+    {
+      "name": "lawFirmId",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-attribute-mapper",
+      "consentRequired": false,
+      "config": {
+        "user.attribute": "lawFirmId",
+        "jsonType.label": "String",
+        "aggregate.attrs": "false",
+        "id.token.claim": "false",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true",
+        "multivalued": "false",
+        "claim.name": "lawFirmId"
+      }
+    }
+  ]
+}

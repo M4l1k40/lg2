@@ -1,0 +1,469 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    container_name: legalflow-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-legalflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-replace-with-rabbitmq-password}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - legalflow_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: legalflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: legalflow
+      POSTGRES_USER: legalflow
+      POSTGRES_PASSWORD: legalflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - legalflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legalflow -d legalflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: legalflow-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: dev-file
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: localhost
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080; echo -e \"GET /realms/legalflow/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; grep -q \"\"issuer\"\" <&3' || exit 1"]
+      interval: 10s
+      timeout: 15s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../backend/gateway
+      dockerfile: Dockerfile
+    container_name: legalflow-gateway
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      CLIENT_SERVICE_URL: http://client-service:8081
+      CASE_SERVICE_URL: http://case-service:8082
+      JUDICIAL_SERVICE_URL: http://judicial-service:8084
+      DOCUMENT_SERVICE_URL: http://document-service:8085
+      DEADLINE_SERVICE_URL: http://deadline-service:8086
+      BILLING_SERVICE_URL: http://billing-service:8088
+      CONSULTATION_SERVICE_URL: http://consultation-service:8089
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8087
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+  client-service:
+    build:
+      context: ../backend/services/client-service
+      dockerfile: Dockerfile
+    container_name: legalflow-client-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/legalflow
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: legalflow
+      SPRING_DATASOURCE_PASSWORD: legalflow
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  case-db:
+    image: postgres:17-alpine
+    container_name: legalflow-case-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: case_db
+      POSTGRES_USER: case_user
+      POSTGRES_PASSWORD: case_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - legalflow_case_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U case_user -d case_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  case-service:
+    build:
+      context: ../backend/services/case-service
+      dockerfile: Dockerfile
+    container_name: legalflow-case-service
+    depends_on:
+      case-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      client-service:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://case-db:5432/case_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: case_user
+      SPRING_DATASOURCE_PASSWORD: case_password
+      CLIENT_SERVICE_URL: http://client-service:8081
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8082:8082"
+    restart: unless-stopped
+
+  judicial-db:
+    image: postgres:17-alpine
+    container_name: legalflow-judicial-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: judicial_db
+      POSTGRES_USER: judicial_user
+      POSTGRES_PASSWORD: judicial_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - legalflow_judicial_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judicial_user -d judicial_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  judicial-service:
+    build:
+      context: ../backend/services/judicial-service
+      dockerfile: Dockerfile
+    container_name: legalflow-judicial-service
+    depends_on:
+      judicial-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      case-service:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://judicial-db:5432/judicial_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: judicial_user
+      SPRING_DATASOURCE_PASSWORD: judicial_password
+      CASE_SERVICE_URL: http://case-service:8082
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
+
+  document-db:
+    image: postgres:17-alpine
+    container_name: legalflow-document-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: document_db
+      POSTGRES_USER: document_user
+      POSTGRES_PASSWORD: document_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - legalflow_document_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U document_user -d document_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  document-service:
+    build:
+      context: ../backend/services/document-service
+      dockerfile: Dockerfile
+    container_name: legalflow-document-service
+    depends_on:
+      document-db:
+        condition: service_healthy
+      case-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://document-db:5432/document_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: document_user
+      SPRING_DATASOURCE_PASSWORD: document_password
+      CASE_SERVICE_URL: http://case-service:8082
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8085:8085"
+    restart: unless-stopped
+
+  deadline-db:
+    image: postgres:17-alpine
+    container_name: legalflow-deadline-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: deadline_db
+      POSTGRES_USER: deadline_user
+      POSTGRES_PASSWORD: deadline_password
+    ports:
+      - "5436:5432"
+    volumes:
+      - legalflow_deadline_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deadline_user -d deadline_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  deadline-service:
+    build:
+      context: ../backend/services/deadline-service
+      dockerfile: Dockerfile
+    container_name: legalflow-deadline-service
+    depends_on:
+      deadline-db:
+        condition: service_healthy
+      case-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://deadline-db:5432/deadline_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: deadline_user
+      SPRING_DATASOURCE_PASSWORD: deadline_password
+      CASE_SERVICE_URL: http://case-service:8082
+      DEADLINE_PROCESSING_INTERVAL_MS: ${DEADLINE_PROCESSING_INTERVAL_MS:-60000}
+      DEADLINE_APPROACHING_THRESHOLDS_DAYS: ${DEADLINE_APPROACHING_THRESHOLDS_DAYS:-7,3,1}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8086:8086"
+    restart: unless-stopped
+
+  billing-db:
+    image: postgres:17-alpine
+    container_name: legalflow-billing-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: billing_db
+      POSTGRES_USER: billing_user
+      POSTGRES_PASSWORD: billing_password
+    ports:
+      - "5439:5432"
+    volumes:
+      - legalflow_billing_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U billing_user -d billing_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  billing-service:
+    build:
+      context: ../backend/services/billing-service
+      dockerfile: Dockerfile
+    container_name: legalflow-billing-service
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      case-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://billing-db:5432/billing_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: billing_user
+      SPRING_DATASOURCE_PASSWORD: billing_password
+      CASE_SERVICE_URL: http://case-service:8082
+      BILLING_PROCESSING_INTERVAL_MS: ${BILLING_PROCESSING_INTERVAL_MS:-60000}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8088:8088"
+    restart: unless-stopped
+
+  consultation-db:
+    image: postgres:17-alpine
+    container_name: legalflow-consultation-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: consultation_db
+      POSTGRES_USER: consultation_user
+      POSTGRES_PASSWORD: consultation_password
+    ports:
+      - "5440:5432"
+    volumes:
+      - legalflow_consultation_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U consultation_user -d consultation_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  consultation-service:
+    build:
+      context: ../backend/services/consultation-service
+      dockerfile: Dockerfile
+    container_name: legalflow-consultation-service
+    depends_on:
+      consultation-db:
+        condition: service_healthy
+      client-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://consultation-db:5432/consultation_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: consultation_user
+      SPRING_DATASOURCE_PASSWORD: consultation_password
+      CLIENT_SERVICE_URL: http://client-service:8081
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8089:8089"
+    restart: unless-stopped
+
+  appointment-db:
+    image: postgres:17-alpine
+    container_name: legalflow-appointment-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: appointment_db
+      POSTGRES_USER: appointment_user
+      POSTGRES_PASSWORD: appointment_password
+    ports:
+      - "5438:5432"
+    volumes:
+      - legalflow_appointment_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appointment_user -d appointment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  appointment-service:
+    build:
+      context: ../backend/services/appointment-service
+      dockerfile: Dockerfile
+    container_name: legalflow-appointment-service
+    depends_on:
+      appointment-db:
+        condition: service_healthy
+      client-service:
+        condition: service_started
+      case-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://appointment-db:5432/appointment_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: appointment_user
+      SPRING_DATASOURCE_PASSWORD: appointment_password
+      CLIENT_SERVICE_URL: http://client-service:8081
+      CASE_SERVICE_URL: http://case-service:8082
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+  notification-db:
+    image: postgres:17-alpine
+    container_name: legalflow-notification-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: notification_password
+    ports:
+      - "5437:5432"
+    volumes:
+      - legalflow_notification_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-service:
+    build:
+      context: ../backend/services/notification-service
+      dockerfile: Dockerfile
+    container_name: legalflow-notification-service
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      client-service:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://notification-db:5432/notification_db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_USERNAME: notification_user
+      SPRING_DATASOURCE_PASSWORD: notification_password
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+      CLIENT_SERVICE_URL: http://client-service:8081
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@legalflow.local}
+      WHATSAPP_MODE: ${WHATSAPP_MODE:-MOCK}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-META}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://graph.facebook.com/v22.0}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+    ports:
+      - "8087:8087"
+    restart: unless-stopped
+
+volumes:
+  legalflow_rabbitmq_data:
+  legalflow_postgres_data:
+  legalflow_case_postgres_data:
+  legalflow_judicial_postgres_data:
+  legalflow_document_postgres_data:
+  legalflow_deadline_postgres_data:
+  legalflow_billing_postgres_data:
+  legalflow_consultation_postgres_data:
+  legalflow_appointment_postgres_data:
+  legalflow_notification_postgres_data:

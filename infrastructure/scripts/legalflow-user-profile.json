@@ -1,0 +1,17 @@
+{
+  "attributes": [
+    {
+      "name": "lawFirmId",
+      "displayName": "${lawFirmId}",
+      "permissions": {
+        "view": ["admin"],
+        "edit": ["admin"]
+      },
+      "validations": {},
+      "annotations": {},
+      "multivalued": false,
+      "group": "user-metadata"
+    }
+  ],
+  "groups": []
+}

@@ -1,0 +1,33 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: legalflow-deadline-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5436/deadline_db}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:deadline_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:deadline_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs}
+
+legalflow:
+  deadlines:
+    processing-interval-ms: ${DEADLINE_PROCESSING_INTERVAL_MS:60000}
+    approaching-thresholds-days: ${DEADLINE_APPROACHING_THRESHOLDS_DAYS:7,3,1}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

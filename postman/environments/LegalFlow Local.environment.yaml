@@ -1,0 +1,8 @@
+name: LegalFlow Local
+values:
+  - key: ''
+    value: ''
+  - key: clientId
+    value: ''
+  - key: caseId
+    value: ''
