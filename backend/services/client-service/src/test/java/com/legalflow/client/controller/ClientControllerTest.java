@@ -11,6 +11,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -35,6 +37,7 @@ class ClientControllerTest {
     private static final UUID FIRM_A = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID FIRM_B = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID CLIENT_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID OTHER_CLIENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
     @Autowired
     private MockMvc mockMvc;
@@ -47,7 +50,7 @@ class ClientControllerTest {
     when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(client(FIRM_A)));
 
     mockMvc.perform(get("/clients/{id}", CLIENT_ID)
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+            .with(staff(FIRM_A))
                         .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value("client@example.test"));
@@ -58,7 +61,7 @@ class ClientControllerTest {
     when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(client(FIRM_A)));
 
     mockMvc.perform(get("/clients/{id}", CLIENT_ID)
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+            .with(staff(FIRM_B)))
         .andExpect(status().isNotFound());
     }
 
@@ -66,11 +69,11 @@ class ClientControllerTest {
     void mismatchedQueryAndBodyTenantsAreForbidden() throws Exception {
     mockMvc.perform(get("/clients")
             .param("lawFirmId", FIRM_A.toString())
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+            .with(staff(FIRM_B)))
         .andExpect(status().isForbidden());
 
     mockMvc.perform(post("/clients")
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+            .with(staff(FIRM_A))
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"lawFirmId":"44444444-4444-4444-4444-444444444444","firstName":"Test","lastName":"Client","email":"body@example.test"}
@@ -80,7 +83,7 @@ class ClientControllerTest {
 
     @Test
     void missingTenantClaimIsForbidden() throws Exception {
-    mockMvc.perform(get("/clients").with(jwt()))
+    mockMvc.perform(get("/clients").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))))
         .andExpect(status().isForbidden());
     }
 
@@ -91,13 +94,13 @@ class ClientControllerTest {
 
     mockMvc.perform(get("/clients")
             .param("lawFirmId", FIRM_A.toString())
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+            .with(staff(FIRM_A)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].email").value("client@example.test"))
         .andExpect(jsonPath("$[1]").doesNotExist());
 
     mockMvc.perform(post("/clients")
-            .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+            .with(staff(FIRM_A))
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"firstName":"New","lastName":"Client","email":"new@example.test"}
@@ -113,7 +116,7 @@ class ClientControllerTest {
         when(clientRepository.existsByEmail("duplicate@example.test")).thenReturn(true);
 
         mockMvc.perform(post("/clients")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(staff(FIRM_A))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"firstName":"Dup","lastName":"Client","email":"duplicate@example.test"}
@@ -136,7 +139,7 @@ class ClientControllerTest {
                 .thenThrow(new DataIntegrityViolationException("unique email constraint"));
 
         mockMvc.perform(post("/clients")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(staff(FIRM_A))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"firstName":"Race","lastName":"Client","email":"race@example.test"}
@@ -153,7 +156,7 @@ class ClientControllerTest {
     @Test
     void malformedJsonUsesStandardBadRequestBody() throws Exception {
         mockMvc.perform(post("/clients")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(staff(FIRM_A))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{"))
                 .andExpect(status().isBadRequest())
@@ -162,6 +165,71 @@ class ClientControllerTest {
                 .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("Request body is invalid."))
                 .andExpect(jsonPath("$.path").value("/clients"));
+    }
+
+    @Test
+    void clientRoleCanReadOnlyItsOwnRecord() throws Exception {
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(client(FIRM_A)));
+
+        mockMvc.perform(get("/clients/{id}", CLIENT_ID).with(clientUser(FIRM_A, CLIENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("client@example.test"));
+
+        mockMvc.perform(get("/clients/{id}", CLIENT_ID).with(clientUser(FIRM_A, OTHER_CLIENT_ID)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void clientMeReturnsTheLinkedRecordAndStaffCannotUseIt() throws Exception {
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(client(FIRM_A)));
+
+        mockMvc.perform(get("/clients/me").with(clientUser(FIRM_A, CLIENT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("client@example.test"));
+
+        mockMvc.perform(get("/clients/me").with(staff(FIRM_A)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void clientRoleCannotListOrCreateClients() throws Exception {
+        mockMvc.perform(get("/clients").with(clientUser(FIRM_A, CLIENT_ID)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/clients")
+                        .with(clientUser(FIRM_A, CLIENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"No","lastName":"Way","email":"noway@example.test"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(clientRepository, never()).save(any(Client.class));
+    }
+
+    @Test
+    void clientRoleWithoutClientIdClaimIsForbidden() throws Exception {
+        mockMvc.perform(get("/clients/{id}", CLIENT_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))
+                                .jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void userWithoutAnyRoleIsForbidden() throws Exception {
+        mockMvc.perform(get("/clients").with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+                .andExpect(status().isForbidden());
+    }
+
+    private static JwtRequestPostProcessor staff(UUID lawFirmId) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))
+                .jwt(token -> token.claim("lawFirmId", lawFirmId.toString()));
+    }
+
+    private static JwtRequestPostProcessor clientUser(UUID lawFirmId, UUID clientId) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))
+                .jwt(token -> token.claim("lawFirmId", lawFirmId.toString())
+                        .claim("clientId", clientId.toString()));
     }
 
     private Client client(UUID lawFirmId) {

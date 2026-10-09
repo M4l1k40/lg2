@@ -37,8 +37,17 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
+    public Client findCurrentClient() {
+        return findById(TenantContext.requireClientId());
+    }
+
+    @Transactional(readOnly = true)
     public Client findById(UUID id) {
         UUID tenantId = TenantContext.requireLawFirmId();
+        // Un utilisateur CLIENT ne peut lire que sa propre fiche (réponse 404 pour ne rien révéler des autres)
+        if (!TenantContext.isStaff() && !id.equals(TenantContext.requireClientId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + id);
+        }
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found: " + id));
         if (!tenantId.equals(client.getLawFirmId())) {

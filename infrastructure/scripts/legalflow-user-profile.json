@@ -11,6 +11,18 @@
       "annotations": {},
       "multivalued": false,
       "group": "user-metadata"
+    },
+    {
+      "name": "clientId",
+      "displayName": "${clientId}",
+      "permissions": {
+        "view": ["admin"],
+        "edit": ["admin"]
+      },
+      "validations": {},
+      "annotations": {},
+      "multivalued": false,
+      "group": "user-metadata"
     }
   ],
   "groups": []

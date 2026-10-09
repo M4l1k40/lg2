@@ -37,6 +37,10 @@ public class CaseService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "lawFirmId query parameter does not match your tenant.");
         }
+        if (!TenantContext.isStaff()) {
+            // Un utilisateur CLIENT ne voit que ses propres dossiers
+            return legalCaseRepository.findAllByLawFirmIdAndClientId(tenantId, TenantContext.requireClientId());
+        }
         return legalCaseRepository.findAllByLawFirmId(tenantId);
     }
 
@@ -48,6 +52,7 @@ public class CaseService {
         if (!tenantId.equals(legalCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found: " + id);
         }
+        requireVisibleToCurrentUser(legalCase, id);
         return legalCase;
     }
 
@@ -59,6 +64,7 @@ public class CaseService {
         if (!tenantId.equals(legalCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found: " + caseId);
         }
+        requireVisibleToCurrentUser(legalCase, caseId);
         return caseEventRepository.findAllByCaseIdOrderByCreatedAtAsc(caseId);
     }
 
@@ -83,5 +89,12 @@ public class CaseService {
     public LegalCase createCase(LegalCase legalCase) {
         legalCase.setStatus(CaseStatus.OPEN);
         return save(legalCase);
+    }
+
+    /** Un CLIENT ne peut accéder qu'à ses propres dossiers (404 sinon, pour ne rien révéler). */
+    private void requireVisibleToCurrentUser(LegalCase legalCase, UUID caseId) {
+        if (!TenantContext.isStaff() && !TenantContext.requireClientId().equals(legalCase.getClientId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found: " + caseId);
+        }
     }
 }

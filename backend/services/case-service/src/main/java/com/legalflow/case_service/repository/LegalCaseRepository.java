@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface LegalCaseRepository extends JpaRepository<LegalCase, UUID> {
 
     List<LegalCase> findAllByLawFirmId(UUID lawFirmId);
+
+    List<LegalCase> findAllByLawFirmIdAndClientId(UUID lawFirmId, UUID clientId);
 }

@@ -1,0 +1,27 @@
+{
+  "name": "clientId",
+  "description": "LegalFlow client record identifier claim (links a CLIENT user to its client record).",
+  "protocol": "openid-connect",
+  "attributes": {
+    "include.in.token.scope": "true",
+    "display.on.consent.screen": "false"
+  },
+  "protocolMappers": [
+    {
+      "name": "clientId",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-attribute-mapper",
+      "consentRequired": false,
+      "config": {
+        "user.attribute": "clientId",
+        "jsonType.label": "String",
+        "aggregate.attrs": "false",
+        "id.token.claim": "false",
+        "access.token.claim": "true",
+        "userinfo.token.claim": "true",
+        "multivalued": "false",
+        "claim.name": "clientId"
+      }
+    }
+  ]
+}

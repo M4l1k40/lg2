@@ -81,6 +81,12 @@ services:
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
     ports:
       - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:9000/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
 
   client-service:
