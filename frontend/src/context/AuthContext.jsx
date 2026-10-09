@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import Keycloak from 'keycloak-js';
+import { getHomePath } from '../utils/roleHome';
 
 const keycloakConfig = {
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
@@ -8,6 +9,25 @@ const keycloakConfig = {
 };
 
 export const keycloak = new Keycloak(keycloakConfig);
+
+// keycloak.init() must run exactly once per page load (it consumes the ?code/#code callback).
+// React.StrictMode runs effects twice in dev, so the shared promise lives at module level:
+// every mount awaits the same init instead of the 2nd one being skipped.
+let keycloakInitPromise = null;
+
+function initKeycloak() {
+  if (!keycloakInitPromise) {
+    keycloakInitPromise = keycloak.init({
+      onLoad: 'check-sso',
+      checkLoginIframe: false,
+      pkceMethod: 'S256'
+    });
+  }
+
+  return keycloakInitPromise;
+}
+
+export { getHomePath };
 
 const AuthContext = createContext(null);
 
@@ -18,61 +38,46 @@ function normalizeRoles(tokenParsed = {}) {
   return [...new Set([...realmRoles, ...resourceRoles].map((role) => role.replace(/^ROLE_/, '').toLowerCase()))];
 }
 
+function buildUser(parsed) {
+  return {
+    id: parsed.sub || null,
+    email: parsed.email || null,
+    name: parsed.name || parsed.preferred_username || null,
+    username: parsed.preferred_username || null,
+    roles: normalizeRoles(parsed),
+    // lawFirmId comes exclusively from the JWT claim, never from user input.
+    lawFirmId: parsed.lawFirmId || parsed.lawfirmid || null,
+    token: keycloak.token || null,
+    tokenParsed: parsed
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    const initAuth = async () => {
-      try {
-        if (initializedRef.current) {
-          return;
-        }
-
-        initializedRef.current = true;
-
-        const authenticated = await keycloak.init({
-          onLoad: 'check-sso',
-          checkLoginIframe: false,
-          pkceMethod: 'S256'
-        });
-
+    initKeycloak()
+      .then((authenticated) => {
         if (!isMounted) {
           return;
         }
 
-        if (authenticated && keycloak.tokenParsed) {
-          const parsed = keycloak.tokenParsed;
-
-          setUser({
-            id: parsed.sub || null,
-            email: parsed.email || null,
-            name: parsed.name || parsed.preferred_username || null,
-            username: parsed.preferred_username || null,
-            roles: normalizeRoles(parsed),
-            lawFirmId: parsed.lawFirmId || parsed.lawfirmid || null,
-            token: keycloak.token || null,
-            tokenParsed: parsed
-          });
-        } else {
-          setUser(null);
-        }
-      } catch (error) {
+        setUser(authenticated && keycloak.tokenParsed ? buildUser(keycloak.tokenParsed) : null);
+      })
+      .catch((error) => {
         console.warn('Keycloak initialization failed:', error);
         if (isMounted) {
           setUser(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (isMounted) {
           setLoading(false);
         }
-      }
-    };
-
-    initAuth();
+      });
 
     return () => {
       isMounted = false;
@@ -123,6 +128,11 @@ export function useAuth() {
   return context;
 }
 
-export function getAuthToken() {
+export async function getAuthToken() {
+  if (!keycloak.authenticated) {
+    return null;
+  }
+
+  await keycloak.updateToken(30);
   return keycloak.token || null;
 }

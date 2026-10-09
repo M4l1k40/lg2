@@ -85,6 +85,7 @@ export default {
   auth: {
     loginTitle: 'تسجيل الدخول',
     loginSubtitle: 'الدخول إلى مساحة المكتب القانوني',
-    continue: 'متابعة'
+    continue: 'متابعة',
+    logout: 'تسجيل الخروج'
   }
 };

@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import SidebarNav from '../components/common/SidebarNav';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const adminNav = [
@@ -15,6 +16,7 @@ const adminNav = [
 
 export default function AdminLayout() {
   const { t, language, setLanguage, dir } = useLanguage();
+  const { logout } = useAuth();
 
   return (
     <div dir={dir} className="min-h-screen bg-slate-100 text-slate-900">
@@ -44,6 +46,13 @@ export default function AdminLayout() {
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   {language === 'fr' ? 'AR' : 'FR'}
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  {t.auth.logout}
                 </button>
               </div>
             </div>

@@ -1,20 +1,24 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getHomePath } from '../utils/roleHome';
 
 export default function LoginPage() {
   const { t, language, setLanguage, dir } = useLanguage();
-  const { login, user } = useAuth();
-  const navigate = useNavigate();
+  const { login, logout, user, loading } = useAuth();
+  const homePath = user ? getHomePath(user.roles || []) : null;
 
-  const handleDemoLogin = () => {
-    if (user) {
-      navigate('/client/dashboard');
-      return;
-    }
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-medium text-slate-600">
+        Chargement de votre espace…
+      </div>
+    );
+  }
 
-    login();
-  };
+  if (homePath) {
+    return <Navigate to={homePath} replace />;
+  }
 
   return (
     <div dir={dir} className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -25,31 +29,22 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Email</label>
-            <input
-              type="email"
-              defaultValue="admin@legalflow.local"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Mot de passe</label>
-            <input
-              type="password"
-              defaultValue="••••••••"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
-            />
-          </div>
-
           <button
             type="button"
-            onClick={handleDemoLogin}
+            onClick={login}
             className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             {t.auth.continue}
           </button>
+
+          {user && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Votre compte est authentifié mais ne possède aucun rôle LegalFlow reconnu.
+              <button type="button" onClick={logout} className="mt-2 block font-semibold underline">
+                {t.auth.logout}
+              </button>
+            </div>
+          )}
 
           <button
             type="button"

@@ -13,6 +13,8 @@ import ClientDashboardPage from './pages/client/ClientDashboardPage';
 import ClientProfilePage from './pages/client/ClientProfilePage';
 import ClientCasesPage from './pages/client/ClientCasesPage';
 import LawyerDashboardPage from './pages/lawyer/LawyerDashboardPage';
+import LawyerClientsPage from './pages/lawyer/LawyerClientsPage';
+import LawyerCasesPage from './pages/lawyer/LawyerCasesPage';
 import SecretaryDashboardPage from './pages/secretary/SecretaryDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -43,8 +45,8 @@ export default function App() {
               <Route path="/lawyer" element={<LawyerLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<LawyerDashboardPage />} />
-                <Route path="clients" element={<PlaceholderPage titleKey="lawyer.nav.clients" />} />
-                <Route path="cases" element={<PlaceholderPage titleKey="lawyer.nav.cases" />} />
+                <Route path="clients" element={<LawyerClientsPage />} />
+                <Route path="cases" element={<LawyerCasesPage />} />
                 <Route path="judicial" element={<PlaceholderPage titleKey="lawyer.nav.judicial" />} />
                 <Route path="deadlines" element={<PlaceholderPage titleKey="lawyer.nav.deadlines" />} />
                 <Route path="appointments" element={<PlaceholderPage titleKey="lawyer.nav.appointments" />} />

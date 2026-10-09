@@ -85,6 +85,7 @@ export default {
   auth: {
     loginTitle: 'Connexion',
     loginSubtitle: 'Accédez à votre espace juridique',
-    continue: 'Continuer'
+    continue: 'Continuer',
+    logout: 'Déconnexion'
   }
 };

@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getHomePath } from '../../utils/roleHome';
 
 export default function ProtectedRoute({ allowedRoles = [], children }) {
   const { user, loading } = useAuth();
@@ -16,12 +17,11 @@ export default function ProtectedRoute({ allowedRoles = [], children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles.length > 0) {
-    const hasAccess = allowedRoles.some((role) => user.roles.includes(String(role).toLowerCase()));
+  const userHomePath = getHomePath(user.roles || []);
+  const hasAllowedRole = allowedRoles.length === 0 || allowedRoles.some((role) => user.roles.includes(String(role).toLowerCase()));
 
-    if (!hasAccess) {
-      return <Navigate to="/login" replace />;
-    }
+  if (!hasAllowedRole) {
+    return userHomePath ? <Navigate to={userHomePath} replace /> : <Navigate to="/login" replace />;
   }
 
   return children || <Outlet />;
