@@ -10,7 +10,6 @@ import java.util.UUID;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateConsultationRequest {
 
-    @NotNull
     private UUID clientId;
 
     @NotBlank

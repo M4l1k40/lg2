@@ -15,6 +15,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     List<Invoice> findAllByLawFirmIdOrderByDueDateAsc(UUID lawFirmId);
 
+    List<Invoice> findAllByLawFirmIdAndClientIdOrderByDueDateAsc(UUID lawFirmId, UUID clientId);
+
     List<Invoice> findAllByLawFirmIdAndStatusOrderByDueDateAsc(UUID lawFirmId, InvoiceStatus status);
 
     List<Invoice> findAllByStatusAndDueDateBefore(InvoiceStatus status, LocalDate dueDate);

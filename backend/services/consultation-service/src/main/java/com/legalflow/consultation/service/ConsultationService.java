@@ -43,11 +43,23 @@ public class ConsultationService {
         this.clientServiceOwnershipVerifier = clientServiceOwnershipVerifier;
     }
 
+    /**
+     * ADMIN/SECRETARY : toutes les consultations du cabinet.
+     * LAWYER : les demandes à prendre en charge et celles qui lui sont assignées.
+     * CLIENT : uniquement les siennes.
+     */
     @Transactional(readOnly = true)
     public List<Consultation> getConsultations(UUID requestedLawFirmId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
-        return consultationRepository.findAllByLawFirmIdOrderByCreatedAtDesc(lawFirmId);
+        if (TenantContext.isOfficeStaff()) {
+            return consultationRepository.findAllByLawFirmIdOrderByCreatedAtDesc(lawFirmId);
+        }
+        if (TenantContext.isLawyer()) {
+            return consultationRepository.findVisibleToLawyer(lawFirmId, TenantContext.requireUserId());
+        }
+        return consultationRepository.findAllByLawFirmIdAndClientIdOrderByCreatedAtDesc(
+                lawFirmId, TenantContext.requireClientId());
     }
 
     @Transactional
@@ -55,21 +67,32 @@ public class ConsultationService {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
 
-        if (request == null || request.getClientId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "clientId is required.");
+        UUID clientId;
+        if (TenantContext.isOfficeStaff() || TenantContext.isLawyer()) {
+            if (request == null || request.getClientId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "clientId is required.");
+            }
+            clientId = request.getClientId();
+        } else {
+            // Un CLIENT ne peut créer une demande que pour lui-même : son identifiant vient de son token.
+            clientId = TenantContext.requireClientId();
+            if (request != null && request.getClientId() != null && !clientId.equals(request.getClientId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "A client can only create consultations for themselves.");
+            }
         }
-        if (request.getSubject() == null || request.getSubject().isBlank()) {
+        if (request == null || request.getSubject() == null || request.getSubject().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subject is required.");
         }
         if (request.getDescription() == null || request.getDescription().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "description is required.");
         }
 
-        clientServiceOwnershipVerifier.verifyClientBelongsToCurrentTenant(request.getClientId());
+        clientServiceOwnershipVerifier.verifyClientBelongsToCurrentTenant(clientId);
 
         Consultation consultation = new Consultation(
                 lawFirmId,
-                request.getClientId(),
+                clientId,
                 null,
                 request.getSubject().trim(),
                 request.getDescription().trim(),
@@ -82,9 +105,10 @@ public class ConsultationService {
     @Transactional(readOnly = true)
     public Consultation getConsultation(UUID id) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
-        return consultationRepository.findByIdAndLawFirmId(id, lawFirmId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Consultation not found: " + id));
+        Consultation consultation = consultationRepository.findByIdAndLawFirmId(id, lawFirmId)
+                .orElseThrow(() -> notFound(id));
+        requireVisibleToCurrentUser(consultation, id);
+        return consultation;
     }
 
     @Transactional
@@ -94,6 +118,13 @@ public class ConsultationService {
                 || consultation.getStatus() == ConsultationStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Consultation cannot be updated in " + consultation.getStatus() + " state.");
+        }
+        if (!TenantContext.isOfficeStaff()) {
+            rejectLawyerOnly("edit");
+            if (consultation.getStatus() != ConsultationStatus.PENDING) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Consultation can only be edited by its client while PENDING.");
+            }
         }
 
         consultation.setSubject(request.getSubject().trim());
@@ -108,6 +139,13 @@ public class ConsultationService {
         if (request == null || request.getLawyerId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lawyerId is required.");
         }
+        if (!TenantContext.isOfficeStaff()) {
+            // Un avocat ne peut que se prendre lui-même en charge.
+            if (!TenantContext.isLawyer() || !TenantContext.requireUserId().equals(request.getLawyerId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "A lawyer can only assign a consultation to themselves.");
+            }
+        }
         consultation.setLawyerId(request.getLawyerId());
         consultation.setStatus(ConsultationStatus.ASSIGNED);
         return consultationRepository.save(consultation);
@@ -116,6 +154,7 @@ public class ConsultationService {
     @Transactional
     public Consultation startConsultation(UUID id) {
         Consultation consultation = getConsultation(id);
+        requireAssignedLawyer(consultation, "start");
         ensureTransitionAllowed(consultation, ConsultationStatus.IN_PROGRESS, "start");
         consultation.setStatus(ConsultationStatus.IN_PROGRESS);
         return consultationRepository.save(consultation);
@@ -124,6 +163,7 @@ public class ConsultationService {
     @Transactional
     public Consultation answerConsultation(UUID id, AnswerConsultationRequest request) {
         Consultation consultation = getConsultation(id);
+        requireAssignedLawyer(consultation, "answer");
         ensureTransitionAllowed(consultation, ConsultationStatus.ANSWERED, "answer");
         if (request == null || request.getAnswer() == null || request.getAnswer().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "answer is required.");
@@ -137,6 +177,9 @@ public class ConsultationService {
     @Transactional
     public Consultation closeConsultation(UUID id) {
         Consultation consultation = getConsultation(id);
+        if (!TenantContext.isOfficeStaff()) {
+            requireAssignedLawyer(consultation, "close");
+        }
         ensureTransitionAllowed(consultation, ConsultationStatus.CLOSED, "close");
         consultation.setStatus(ConsultationStatus.CLOSED);
         consultation.setClosedAt(LocalDateTime.now());
@@ -146,6 +189,7 @@ public class ConsultationService {
     @Transactional
     public Consultation cancelConsultation(UUID id) {
         Consultation consultation = getConsultation(id);
+        rejectLawyerOnly("cancel");
         ensureTransitionAllowed(consultation, ConsultationStatus.CANCELLED, "cancel");
         consultation.setStatus(ConsultationStatus.CANCELLED);
         return consultationRepository.save(consultation);
@@ -154,6 +198,7 @@ public class ConsultationService {
     @Transactional
     public void deleteConsultation(UUID id) {
         Consultation consultation = getConsultation(id);
+        rejectLawyerOnly("delete");
         if (consultation.getStatus() == ConsultationStatus.CLOSED
                 || consultation.getStatus() == ConsultationStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -167,6 +212,40 @@ public class ConsultationService {
         if (requestedLawFirmId != null && !authenticatedLawFirmId.equals(requestedLawFirmId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Requested lawFirmId does not match the authenticated law firm.");
+        }
+    }
+
+    private ResponseStatusException notFound(UUID id) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "Consultation not found: " + id);
+    }
+
+    /** 404 (et non 403) pour ne rien révéler de l'existence des consultations des autres. */
+    private void requireVisibleToCurrentUser(Consultation consultation, UUID id) {
+        if (TenantContext.isOfficeStaff()) {
+            return;
+        }
+        if (TenantContext.isLawyer()) {
+            boolean unassignedRequest = consultation.getStatus() == ConsultationStatus.PENDING;
+            if (unassignedRequest || TenantContext.requireUserId().equals(consultation.getLawyerId())) {
+                return;
+            }
+            throw notFound(id);
+        }
+        if (!TenantContext.requireClientId().equals(consultation.getClientId())) {
+            throw notFound(id);
+        }
+    }
+
+    private void requireAssignedLawyer(Consultation consultation, String action) {
+        if (!TenantContext.isLawyer() || !TenantContext.requireUserId().equals(consultation.getLawyerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only the assigned lawyer can " + action + " this consultation.");
+        }
+    }
+
+    private void rejectLawyerOnly(String action) {
+        if (!TenantContext.isOfficeStaff() && TenantContext.isLawyer()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lawyers cannot " + action + " consultations.");
         }
     }
 

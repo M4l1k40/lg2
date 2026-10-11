@@ -1,5 +1,6 @@
 package com.legalflow.deadline.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.legalflow.deadline.config.DeadlineSecurityConfig;
 import com.legalflow.deadline.domain.Deadline;
 import com.legalflow.deadline.domain.DeadlineStatus;
@@ -153,12 +154,12 @@ class DeadlineControllerTenantTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForA() {
-        return jwt().jwt(token -> token.subject("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
                 .claim("lawFirmId", FIRM_A.toString()));
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForB() {
-        return jwt().jwt(token -> token.subject("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
                 .claim("lawFirmId", FIRM_B.toString()));
     }
 }

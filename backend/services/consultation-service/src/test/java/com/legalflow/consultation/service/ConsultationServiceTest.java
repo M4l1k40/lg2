@@ -5,21 +5,29 @@ import com.legalflow.consultation.domain.ConsultationStatus;
 import com.legalflow.consultation.dto.AnswerConsultationRequest;
 import com.legalflow.consultation.dto.AssignConsultationRequest;
 import com.legalflow.consultation.dto.CreateConsultationRequest;
+import com.legalflow.consultation.dto.UpdateConsultationRequest;
 import com.legalflow.consultation.integration.ClientServiceOwnershipVerifier;
 import com.legalflow.consultation.repository.ConsultationRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -27,84 +35,249 @@ import static org.mockito.Mockito.when;
 
 class ConsultationServiceTest {
 
+    private static final UUID FIRM_A = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID CLIENT_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID OTHER_CLIENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID LAWYER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID OTHER_LAWYER_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    private static final UUID SECRETARY_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+    private static final UUID CONSULTATION_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
+    private ConsultationRepository repository;
+    private ClientServiceOwnershipVerifier verifier;
+    private ConsultationService service;
+
+    @BeforeEach
+    void setUp() {
+        repository = mock(ConsultationRepository.class);
+        verifier = mock(ClientServiceOwnershipVerifier.class);
+        service = new ConsultationService(repository, verifier);
+        when(repository.save(any(Consultation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
-    void createConsultationUsesAuthenticatedTenantAndVerifiesClient() {
-        ConsultationRepository repository = mock(ConsultationRepository.class);
-        ClientServiceOwnershipVerifier verifier = mock(ClientServiceOwnershipVerifier.class);
-        ConsultationService service = new ConsultationService(repository, verifier);
+    void officeStaffCreatesConsultationForAClientAndVerifiesIt() {
+        authenticate(SECRETARY_ID, null, "SECRETARY");
 
-        UUID firmA = UUID.fromString("11111111-1111-1111-1111-111111111111");
-        UUID clientId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-        setCurrentTenant(firmA);
+        Consultation result = service.createConsultation(createRequest(CLIENT_ID), null);
 
-        CreateConsultationRequest request = new CreateConsultationRequest();
-        request.setClientId(clientId);
-        request.setSubject("Question");
-        request.setDescription("Need legal advice");
-
-        Consultation saved = new Consultation(firmA, clientId, null, "Question", "Need legal advice", ConsultationStatus.PENDING, null);
-        when(repository.save(any(Consultation.class))).thenReturn(saved);
-
-        Consultation result = service.createConsultation(request, null);
-
-        assertEquals(firmA, result.getLawFirmId());
+        assertEquals(FIRM_A, result.getLawFirmId());
+        assertEquals(CLIENT_ID, result.getClientId());
         assertEquals(ConsultationStatus.PENDING, result.getStatus());
-        verify(verifier).verifyClientBelongsToCurrentTenant(clientId);
+        verify(verifier).verifyClientBelongsToCurrentTenant(CLIENT_ID);
+    }
+
+    @Test
+    void clientCreatesConsultationForThemselvesOnly() {
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+
+        Consultation result = service.createConsultation(createRequest(null), null);
+        assertEquals(CLIENT_ID, result.getClientId());
+        verify(verifier).verifyClientBelongsToCurrentTenant(CLIENT_ID);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.createConsultation(createRequest(OTHER_CLIENT_ID), null));
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
     }
 
     @Test
     void invalidTransitionThrowsBusinessException() {
-        ConsultationRepository repository = mock(ConsultationRepository.class);
-        ClientServiceOwnershipVerifier verifier = mock(ClientServiceOwnershipVerifier.class);
-        ConsultationService service = new ConsultationService(repository, verifier);
-
-        UUID firmA = UUID.fromString("11111111-1111-1111-1111-111111111111");
-        setCurrentTenant(firmA);
-
-        UUID consultationId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-        Consultation consultation = new Consultation(
-                firmA,
-                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                null,
-                "Question",
-                "Need advice",
-                ConsultationStatus.ANSWERED,
-                null
-        );
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        Consultation consultation = consultation(CLIENT_ID, null, ConsultationStatus.ANSWERED);
         consultation.setAnsweredAt(LocalDateTime.now());
-        when(repository.findByIdAndLawFirmId(consultationId, firmA)).thenReturn(Optional.of(consultation));
+        stub(consultation);
 
         AssignConsultationRequest assignRequest = new AssignConsultationRequest();
-        assignRequest.setLawyerId(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        assignRequest.setLawyerId(LAWYER_ID);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                () -> service.assignConsultation(consultationId, assignRequest));
+                () -> service.assignConsultation(CONSULTATION_ID, assignRequest));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
 
     @Test
     void getConsultationRejectsMissingTenantMatch() {
-        ConsultationRepository repository = mock(ConsultationRepository.class);
-        ClientServiceOwnershipVerifier verifier = mock(ClientServiceOwnershipVerifier.class);
-        ConsultationService service = new ConsultationService(repository, verifier);
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        when(repository.findByIdAndLawFirmId(CONSULTATION_ID, FIRM_A)).thenReturn(Optional.empty());
 
-        UUID consultationId = UUID.fromString("44444444-4444-4444-4444-444444444444");
-        UUID firmA = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
-        setCurrentTenant(firmA);
-        when(repository.findByIdAndLawFirmId(consultationId, firmA)).thenReturn(Optional.empty());
-
-        assertThrows(ResponseStatusException.class, () -> service.getConsultation(consultationId));
+        assertThrows(ResponseStatusException.class, () -> service.getConsultation(CONSULTATION_ID));
     }
 
-    private void setCurrentTenant(UUID lawFirmId) {
-        Jwt jwt = Jwt.withTokenValue("token")
+    @Test
+    void clientCannotSeeAnotherClientsConsultation() {
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+
+        stub(consultation(OTHER_CLIENT_ID, null, ConsultationStatus.PENDING));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.getConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+        assertNotNull(service.getConsultation(CONSULTATION_ID));
+    }
+
+    @Test
+    void lawyerSeesPendingRequestsAndOwnAssignmentsOnly() {
+        authenticate(LAWYER_ID, null, "LAWYER");
+
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+        assertNotNull(service.getConsultation(CONSULTATION_ID));
+
+        stub(consultation(CLIENT_ID, OTHER_LAWYER_ID, ConsultationStatus.ASSIGNED));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.getConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+
+        stub(consultation(CLIENT_ID, LAWYER_ID, ConsultationStatus.ASSIGNED));
+        assertNotNull(service.getConsultation(CONSULTATION_ID));
+    }
+
+    @Test
+    void listingDependsOnTheRole() {
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        service.getConsultations(null);
+        verify(repository).findAllByLawFirmIdOrderByCreatedAtDesc(FIRM_A);
+
+        authenticate(LAWYER_ID, null, "LAWYER");
+        service.getConsultations(null);
+        verify(repository).findVisibleToLawyer(FIRM_A, LAWYER_ID);
+
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+        service.getConsultations(null);
+        verify(repository).findAllByLawFirmIdAndClientIdOrderByCreatedAtDesc(FIRM_A, CLIENT_ID);
+    }
+
+    @Test
+    void lawyerCanOnlyAssignConsultationToThemselves() {
+        authenticate(LAWYER_ID, null, "LAWYER");
+        Consultation consultation = consultation(CLIENT_ID, null, ConsultationStatus.PENDING);
+        stub(consultation);
+
+        AssignConsultationRequest forSomeoneElse = new AssignConsultationRequest();
+        forSomeoneElse.setLawyerId(OTHER_LAWYER_ID);
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.assignConsultation(CONSULTATION_ID, forSomeoneElse));
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+
+        AssignConsultationRequest forMyself = new AssignConsultationRequest();
+        forMyself.setLawyerId(LAWYER_ID);
+        Consultation result = service.assignConsultation(CONSULTATION_ID, forMyself);
+        assertEquals(ConsultationStatus.ASSIGNED, result.getStatus());
+        assertEquals(LAWYER_ID, result.getLawyerId());
+    }
+
+    @Test
+    void officeStaffCanAssignAnyLawyer() {
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+
+        AssignConsultationRequest request = new AssignConsultationRequest();
+        request.setLawyerId(LAWYER_ID);
+        Consultation result = service.assignConsultation(CONSULTATION_ID, request);
+
+        assertEquals(ConsultationStatus.ASSIGNED, result.getStatus());
+        assertEquals(LAWYER_ID, result.getLawyerId());
+    }
+
+    @Test
+    void onlyTheAssignedLawyerCanStartAndAnswer() {
+        Consultation consultation = consultation(CLIENT_ID, LAWYER_ID, ConsultationStatus.ASSIGNED);
+        stub(consultation);
+
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        ResponseStatusException notLawyer = assertThrows(ResponseStatusException.class,
+                () -> service.startConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.FORBIDDEN, notLawyer.getStatusCode());
+
+        authenticate(OTHER_LAWYER_ID, null, "LAWYER");
+        ResponseStatusException otherLawyer = assertThrows(ResponseStatusException.class,
+                () -> service.startConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.NOT_FOUND, otherLawyer.getStatusCode());
+
+        authenticate(LAWYER_ID, null, "LAWYER");
+        assertEquals(ConsultationStatus.IN_PROGRESS, service.startConsultation(CONSULTATION_ID).getStatus());
+
+        AnswerConsultationRequest answer = new AnswerConsultationRequest();
+        answer.setAnswer("Voici ma réponse détaillée.");
+        Consultation answered = service.answerConsultation(CONSULTATION_ID, answer);
+        assertEquals(ConsultationStatus.ANSWERED, answered.getStatus());
+        assertEquals("Voici ma réponse détaillée.", answered.getAnswer());
+        assertNotNull(answered.getAnsweredAt());
+
+        assertEquals(ConsultationStatus.CLOSED, service.closeConsultation(CONSULTATION_ID).getStatus());
+    }
+
+    @Test
+    void clientCanEditOnlyItsOwnPendingConsultation() {
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+        UpdateConsultationRequest request = new UpdateConsultationRequest();
+        request.setSubject("Nouveau sujet");
+        request.setDescription("Nouvelle description détaillée");
+
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+        assertEquals("Nouveau sujet", service.updateConsultation(CONSULTATION_ID, request).getSubject());
+
+        stub(consultation(CLIENT_ID, LAWYER_ID, ConsultationStatus.ASSIGNED));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.updateConsultation(CONSULTATION_ID, request));
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+    }
+
+    @Test
+    void clientCanCancelItsOwnConsultation() {
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+
+        assertEquals(ConsultationStatus.CANCELLED, service.cancelConsultation(CONSULTATION_ID).getStatus());
+    }
+
+    @Test
+    void lawyerCannotCancelOrDeleteConsultations() {
+        authenticate(LAWYER_ID, null, "LAWYER");
+        stub(consultation(CLIENT_ID, LAWYER_ID, ConsultationStatus.ASSIGNED));
+
+        ResponseStatusException cancel = assertThrows(ResponseStatusException.class,
+                () -> service.cancelConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.FORBIDDEN, cancel.getStatusCode());
+
+        ResponseStatusException delete = assertThrows(ResponseStatusException.class,
+                () -> service.deleteConsultation(CONSULTATION_ID));
+        assertEquals(HttpStatus.FORBIDDEN, delete.getStatusCode());
+    }
+
+    private void stub(Consultation consultation) {
+        when(repository.findByIdAndLawFirmId(CONSULTATION_ID, FIRM_A)).thenReturn(Optional.of(consultation));
+    }
+
+    private Consultation consultation(UUID clientId, UUID lawyerId, ConsultationStatus status) {
+        return new Consultation(FIRM_A, clientId, lawyerId, "Question", "Need legal advice", status, null);
+    }
+
+    private CreateConsultationRequest createRequest(UUID clientId) {
+        CreateConsultationRequest request = new CreateConsultationRequest();
+        request.setClientId(clientId);
+        request.setSubject("Question");
+        request.setDescription("Need legal advice");
+        return request;
+    }
+
+    private void authenticate(UUID userId, UUID clientId, String... roles) {
+        Jwt.Builder builder = Jwt.withTokenValue("token")
                 .header("alg", "none")
-                .claim("lawFirmId", lawFirmId.toString())
-                .subject("lawyer-a")
-                .build();
-        JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+                .claim("lawFirmId", FIRM_A.toString())
+                .subject(userId.toString());
+        if (clientId != null) {
+            builder.claim("clientId", clientId.toString());
+        }
+        List<GrantedAuthority> authorities = Arrays.stream(roles)
+                .<GrantedAuthority>map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .toList();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(builder.build(), authorities));
     }
 }

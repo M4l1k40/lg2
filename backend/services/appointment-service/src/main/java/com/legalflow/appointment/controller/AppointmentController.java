@@ -1,5 +1,6 @@
 package com.legalflow.appointment.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.appointment.dto.AppointmentRequest;
 import com.legalflow.appointment.dto.AppointmentResponse;
 import com.legalflow.appointment.service.AppointmentService;
@@ -30,33 +31,39 @@ public class AppointmentController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<AppointmentResponse> getAll(@RequestParam(required = false) UUID lawFirmId) {
         return appointmentService.getAll(lawFirmId);
     }
 
     @GetMapping("/case/{caseId}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<AppointmentResponse> getByCase(@PathVariable UUID caseId) {
         return appointmentService.getByCase(caseId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public AppointmentResponse create(@Valid @RequestBody AppointmentRequest request) {
         return appointmentService.create(request);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public AppointmentResponse getById(@PathVariable UUID id) {
         return appointmentService.getById(id);
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public AppointmentResponse updateStatus(@PathVariable UUID id, @RequestParam String status) {
         return appointmentService.updateStatus(id, status);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY')")
     public void delete(@PathVariable UUID id) {
         appointmentService.delete(id);
     }

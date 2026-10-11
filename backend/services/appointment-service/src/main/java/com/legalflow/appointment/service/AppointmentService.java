@@ -34,11 +34,25 @@ public class AppointmentService {
         this.ownershipVerifier = ownershipVerifier;
     }
 
+    /**
+     * ADMIN/SECRETARY : tous les rendez-vous du cabinet.
+     * LAWYER : uniquement les siens. CLIENT : uniquement les siens.
+     */
     @Transactional(readOnly = true)
     public List<AppointmentResponse> getAll(UUID requestedLawFirmId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
-        return appointmentRepository.findAllByLawFirmIdOrderByDateTimeAsc(lawFirmId).stream()
+        List<Appointment> appointments;
+        if (TenantContext.isOfficeStaff()) {
+            appointments = appointmentRepository.findAllByLawFirmIdOrderByDateTimeAsc(lawFirmId);
+        } else if (TenantContext.isLawyer()) {
+            appointments = appointmentRepository.findAllByLawFirmIdAndLawyerIdOrderByDateTimeAsc(
+                    lawFirmId, TenantContext.requireUserId());
+        } else {
+            appointments = appointmentRepository.findAllByLawFirmIdAndClientIdOrderByDateTimeAsc(
+                    lawFirmId, TenantContext.requireClientId());
+        }
+        return appointments.stream()
                 .map(AppointmentResponse::from)
                 .toList();
     }
@@ -48,6 +62,7 @@ public class AppointmentService {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         ownershipVerifier.verifyCaseBelongsToCurrentTenant(caseId);
         return appointmentRepository.findAllByLawFirmIdAndCaseIdOrderByDateTimeAsc(lawFirmId, caseId).stream()
+                .filter(this::isVisibleToCurrentUser)
                 .map(AppointmentResponse::from)
                 .toList();
     }
@@ -56,11 +71,16 @@ public class AppointmentService {
     public AppointmentResponse create(AppointmentRequest request) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(request.getLawFirmId(), lawFirmId);
-
+        if (!TenantContext.isOfficeStaff()) {
+            // Un avocat ne peut planifier que ses propres rendez-vous.
+            if (!TenantContext.isLawyer() || !TenantContext.requireUserId().equals(request.getLawyerId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "A lawyer can only schedule appointments for themselves.");
+            }
+        }
         ownershipVerifier.verifyClientBelongsToCurrentTenant(request.getClientId());
         ownershipVerifier.verifyCaseBelongsToCurrentTenant(request.getCaseId());
         // TODO: validate lawyerId once a user/lawyer directory service exists
-
         Appointment appointment = new Appointment(
                 lawFirmId,
                 request.getCaseId(),
@@ -90,6 +110,9 @@ public class AppointmentService {
                     "Unknown appointment status: " + requestedStatus);
         }
 
+        if (!TenantContext.isStaff() && nextStatus != AppointmentStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "A client can only cancel an appointment.");
+        }
         AppointmentStatus currentStatus = appointment.getStatus();
         if (!STATUS_TRANSITIONS.getOrDefault(currentStatus, Set.of()).contains(nextStatus)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -102,14 +125,33 @@ public class AppointmentService {
 
     @Transactional
     public void delete(UUID id) {
-        appointmentRepository.delete(findOwnedAppointment(id));
+        Appointment appointment = findOwnedAppointment(id);
+        if (!TenantContext.isOfficeStaff()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the office staff can delete appointments.");
+        }
+        appointmentRepository.delete(appointment);
     }
 
     private Appointment findOwnedAppointment(UUID id) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
-        return appointmentRepository.findByIdAndLawFirmId(id, lawFirmId)
+        Appointment appointment = appointmentRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Appointment not found: " + id));
+        if (!isVisibleToCurrentUser(appointment)) {
+            // 404 plutôt que 403 : on ne révèle pas l'existence des rendez-vous des autres.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Appointment not found: " + id);
+        }
+        return appointment;
+    }
+
+    private boolean isVisibleToCurrentUser(Appointment appointment) {
+        if (TenantContext.isOfficeStaff()) {
+            return true;
+        }
+        if (TenantContext.isLawyer()) {
+            return TenantContext.requireUserId().equals(appointment.getLawyerId());
+        }
+        return TenantContext.requireClientId().equals(appointment.getClientId());
     }
 
     private void rejectMismatchedTenant(UUID requestedLawFirmId, UUID authenticatedLawFirmId) {

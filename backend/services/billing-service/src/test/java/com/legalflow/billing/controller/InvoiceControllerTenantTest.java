@@ -1,5 +1,6 @@
 package com.legalflow.billing.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.legalflow.billing.domain.Invoice;
 import com.legalflow.billing.domain.InvoiceStatus;
@@ -66,7 +67,7 @@ class InvoiceControllerTenantTest {
         request.setDueDate(LocalDate.now().plusDays(15));
 
         mockMvc.perform(post("/invoices")
-                        .with(jwt().jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")).jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -77,7 +78,7 @@ class InvoiceControllerTenantTest {
         assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.SENT);
 
         mockMvc.perform(post("/invoices")
-                        .with(jwt().jwt(token -> token.subject("lawyer-b").claim("lawFirmId", firmB.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")).jwt(token -> token.subject("lawyer-b").claim("lawFirmId", firmB.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -99,19 +100,19 @@ class InvoiceControllerTenantTest {
         request.setDueDate(LocalDate.now().plusDays(3));
 
         mockMvc.perform(post("/invoices")
-                        .with(jwt().jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")).jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         mockMvc.perform(get("/invoices")
-                        .with(jwt().jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")).jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].invoiceNumber").value("INV-2001"));
 
         mockMvc.perform(patch("/invoices/{id}/status", invoiceRepository.findAll().getFirst().getId())
                         .param("status", "PAID")
-                        .with(jwt().jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")).jwt(token -> token.subject("lawyer-a").claim("lawFirmId", firmA.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PAID"));
     }

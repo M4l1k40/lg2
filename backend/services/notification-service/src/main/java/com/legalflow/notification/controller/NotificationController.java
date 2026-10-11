@@ -1,5 +1,6 @@
 package com.legalflow.notification.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.notification.dto.NotificationCreateRequest;
 import com.legalflow.notification.dto.NotificationResponse;
 import com.legalflow.notification.dto.ReadAllResponse;
@@ -30,43 +31,51 @@ public class NotificationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<NotificationResponse> getAll() {
         return notificationService.getAll();
     }
 
     @GetMapping("/unread")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<NotificationResponse> getUnread() {
         return notificationService.getUnread();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public NotificationResponse create(@Valid @RequestBody NotificationCreateRequest request) {
         return notificationService.create(request);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public NotificationResponse getById(@PathVariable UUID id) {
         return notificationService.getById(id);
     }
 
     @GetMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public NotificationResponse getStatus(@PathVariable UUID id) {
         return notificationService.getStatus(id);
     }
 
     @PatchMapping("/{id}/read")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public NotificationResponse markRead(@PathVariable UUID id) {
         return notificationService.markRead(id);
     }
 
     @PatchMapping("/read-all")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public ReadAllResponse markAllRead() {
         return notificationService.markAllRead();
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public void delete(@PathVariable UUID id) {
         notificationService.delete(id);
     }

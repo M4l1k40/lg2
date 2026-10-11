@@ -1,5 +1,6 @@
 package com.legalflow.notification.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.legalflow.notification.config.NotificationSecurityConfig;
 import com.legalflow.notification.domain.Notification;
 import com.legalflow.notification.domain.NotificationChannel;
@@ -76,7 +77,7 @@ class NotificationControllerTenantIsolationTest {
         });
 
         mockMvc.perform(post("/notifications")
-                        .with(jwt().jwt(token -> token.subject(USER_A.toString())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_A.toString())
                                 .claim("lawFirmId", FIRM_A.toString())
                                 .claim("sid", USER_B.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER")))))
@@ -114,7 +115,7 @@ class NotificationControllerTenantIsolationTest {
         });
 
         mockMvc.perform(post("/notifications")
-                        .with(jwt().jwt(token -> token.subject(USER_A.toString())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_A.toString())
                                 .claim("lawFirmId", FIRM_A.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("SECRETARY")))))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,7 +137,7 @@ class NotificationControllerTenantIsolationTest {
                 });
 
                 mockMvc.perform(post("/notifications")
-                                                .with(jwt().jwt(token -> token.subject(USER_A.toString())
+                                                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_A.toString())
                                                                 .claim("lawFirmId", FIRM_A.toString())
                                                                 .claim("realm_access", java.util.Map.of("roles", List.of("ADMIN")))))
                                                 .contentType(MediaType.APPLICATION_JSON)
@@ -327,7 +328,7 @@ class NotificationControllerTenantIsolationTest {
     @Test
     void missingTenantClaimReturns403() throws Exception {
         mockMvc.perform(get("/notifications")
-                        .with(jwt().jwt(token -> token.subject(USER_A.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_A.toString()))))
                 .andExpect(status().isForbidden());
     }
 
@@ -343,17 +344,17 @@ class NotificationControllerTenantIsolationTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForA() {
-                return jwt().jwt(token -> token.subject(USER_A.toString()).claim("lawFirmId", FIRM_A.toString())
+                return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_A.toString()).claim("lawFirmId", FIRM_A.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER"))));
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForB() {
-                return jwt().jwt(token -> token.subject(USER_B.toString()).claim("lawFirmId", FIRM_B.toString())
+                return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_B.toString()).claim("lawFirmId", FIRM_B.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER"))));
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForBInFirmA() {
-                return jwt().jwt(token -> token.subject(USER_B.toString()).claim("lawFirmId", FIRM_A.toString())
+                return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_B.toString()).claim("lawFirmId", FIRM_A.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER"))));
     }
 }

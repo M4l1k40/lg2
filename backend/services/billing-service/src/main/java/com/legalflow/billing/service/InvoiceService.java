@@ -40,6 +40,11 @@ public class InvoiceService {
     public List<Invoice> getInvoices(UUID requestedLawFirmId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
+        if (!TenantContext.isStaff()) {
+            // Un CLIENT ne voit que ses propres factures.
+            return invoiceRepository.findAllByLawFirmIdAndClientIdOrderByDueDateAsc(
+                    lawFirmId, TenantContext.requireClientId());
+        }
         return invoiceRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId);
     }
 
@@ -71,8 +76,13 @@ public class InvoiceService {
     @Transactional(readOnly = true)
     public Invoice getInvoice(UUID id) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
-        return invoiceRepository.findByIdAndLawFirmId(id, lawFirmId)
+        Invoice invoice = invoiceRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id));
+        if (!TenantContext.isStaff() && !TenantContext.requireClientId().equals(invoice.getClientId())) {
+            // 404 plutôt que 403 : on ne révèle pas l'existence des factures des autres clients.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id);
+        }
+        return invoice;
     }
 
     @Transactional

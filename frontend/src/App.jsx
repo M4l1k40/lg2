@@ -15,6 +15,9 @@ import ClientCasesPage from './pages/client/ClientCasesPage';
 import LawyerDashboardPage from './pages/lawyer/LawyerDashboardPage';
 import LawyerClientsPage from './pages/lawyer/LawyerClientsPage';
 import LawyerCasesPage from './pages/lawyer/LawyerCasesPage';
+import LawyerConsultationsPage from './pages/lawyer/LawyerConsultationsPage';
+import ClientConsultationsPage from './pages/client/ClientConsultationsPage';
+import OfficeConsultationsPage from './pages/secretary/OfficeConsultationsPage';
 import SecretaryDashboardPage from './pages/secretary/SecretaryDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -33,6 +36,7 @@ export default function App() {
                 <Route path="dashboard" element={<ClientDashboardPage />} />
                 <Route path="profile" element={<ClientProfilePage />} />
                 <Route path="cases" element={<ClientCasesPage />} />
+                <Route path="consultations" element={<ClientConsultationsPage />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="client.nav.documents" />} />
                 <Route path="judicial" element={<PlaceholderPage titleKey="client.nav.judicial" />} />
                 <Route path="payments" element={<PlaceholderPage titleKey="client.nav.payments" />} />
@@ -51,7 +55,7 @@ export default function App() {
                 <Route path="deadlines" element={<PlaceholderPage titleKey="lawyer.nav.deadlines" />} />
                 <Route path="appointments" element={<PlaceholderPage titleKey="lawyer.nav.appointments" />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="lawyer.nav.documents" />} />
-                <Route path="consultations" element={<PlaceholderPage titleKey="lawyer.nav.consultations" />} />
+                <Route path="consultations" element={<LawyerConsultationsPage />} />
                 <Route path="notifications" element={<PlaceholderPage titleKey="lawyer.nav.notifications" />} />
               </Route>
             </Route>
@@ -63,6 +67,7 @@ export default function App() {
                 <Route path="lawyers" element={<PlaceholderPage titleKey="secretary.nav.lawyers" />} />
                 <Route path="clients" element={<PlaceholderPage titleKey="secretary.nav.clients" />} />
                 <Route path="cases" element={<PlaceholderPage titleKey="secretary.nav.cases" />} />
+                <Route path="consultations" element={<OfficeConsultationsPage />} />
                 <Route path="appointments" element={<PlaceholderPage titleKey="secretary.nav.appointments" />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="secretary.nav.documents" />} />
                 <Route path="payments" element={<PlaceholderPage titleKey="secretary.nav.payments" />} />
@@ -79,6 +84,7 @@ export default function App() {
                 <Route path="secretaries" element={<PlaceholderPage titleKey="admin.nav.secretaries" />} />
                 <Route path="clients" element={<PlaceholderPage titleKey="admin.nav.clients" />} />
                 <Route path="cases" element={<PlaceholderPage titleKey="admin.nav.cases" />} />
+                <Route path="consultations" element={<OfficeConsultationsPage />} />
                 <Route path="billing" element={<PlaceholderPage titleKey="admin.nav.billing" />} />
                 <Route path="settings" element={<PlaceholderPage titleKey="admin.nav.settings" />} />
               </Route>

@@ -1,5 +1,6 @@
 package com.legalflow.document.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.document.domain.Document;
 import com.legalflow.document.dto.DocumentRequest;
 import com.legalflow.document.service.DocumentService;
@@ -30,27 +31,32 @@ public class DocumentController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public Document createDocument(@Valid @RequestBody DocumentRequest request) {
         return documentService.createDocument(request);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public Document getDocument(@PathVariable UUID id) {
         return documentService.getDocument(id);
     }
 
     @GetMapping("/case/{caseId}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<Document> getDocumentsByCase(@PathVariable UUID caseId) {
         return documentService.getDocumentsByCase(caseId);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Document updateDocument(@PathVariable UUID id, @Valid @RequestBody DocumentRequest request) {
         return documentService.updateDocument(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public void deleteDocument(@PathVariable UUID id) {
         documentService.deleteDocument(id);
     }

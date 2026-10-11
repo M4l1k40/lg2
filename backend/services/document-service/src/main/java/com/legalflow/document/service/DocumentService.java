@@ -1,6 +1,7 @@
 package com.legalflow.document.service;
 
 import com.legalflow.document.domain.Document;
+import com.legalflow.document.domain.DocumentVisibility;
 import com.legalflow.document.dto.DocumentRequest;
 import com.legalflow.document.integration.CaseServiceOwnershipVerifier;
 import com.legalflow.document.repository.DocumentRepository;
@@ -39,15 +40,53 @@ public class DocumentService {
     public List<Document> getDocumentsByCase(UUID caseId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(caseId);
-        return documentRepository.findAllByLawFirmIdAndCaseIdOrderByCreatedAtDesc(lawFirmId, caseId);
+        return documentRepository.findAllByLawFirmIdAndCaseIdOrderByCreatedAtDesc(lawFirmId, caseId).stream()
+                .filter(this::isVisibleByRole)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public Document getDocument(UUID id) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
-        return documentRepository.findByIdAndLawFirmId(id, lawFirmId)
+        Document document = documentRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Document not found: " + id));
+        if (!TenantContext.isStaff()) {
+            // Un CLIENT n'accède qu'aux documents partagés d'un dossier qui lui appartient.
+            try {
+                caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(document.getCaseId());
+            } catch (ResponseStatusException exception) {
+                if (exception.getStatusCode().value() == HttpStatus.UNPROCESSABLE_ENTITY.value()) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found: " + id);
+                }
+                throw exception;
+            }
+        }
+        if (!isVisibleByRole(document)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found: " + id);
+        }
+        return document;
+    }
+
+    /**
+     * Visibilité d'un document (le dossier a déjà été vérifié) :
+     * CASE_MEMBERS : personnel du cabinet et client du dossier ;
+     * LAWYER_ONLY : ADMIN et LAWYER ; PRIVATE : son auteur et ADMIN. Le CLIENT ne voit que CASE_MEMBERS.
+     */
+    private boolean isVisibleByRole(Document document) {
+        DocumentVisibility visibility = document.getVisibility();
+        if (!TenantContext.isStaff()) {
+            return visibility == DocumentVisibility.CASE_MEMBERS;
+        }
+        if (visibility == DocumentVisibility.LAWYER_ONLY) {
+            return TenantContext.hasRole("ADMIN") || TenantContext.isLawyer();
+        }
+        if (visibility == DocumentVisibility.PRIVATE) {
+            UUID currentUserId = TenantContext.currentUserIdOrNull();
+            boolean uploader = document.getUploadedBy() != null && document.getUploadedBy().equals(currentUserId);
+            return uploader || TenantContext.hasRole("ADMIN");
+        }
+        return true;
     }
 
     @Transactional

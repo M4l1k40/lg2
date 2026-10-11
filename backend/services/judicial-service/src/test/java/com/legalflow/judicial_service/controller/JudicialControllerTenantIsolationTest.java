@@ -1,5 +1,6 @@
 package com.legalflow.judicial_service.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.legalflow.judicial_service.config.JudicialSecurityConfig;
@@ -84,7 +85,7 @@ class JudicialControllerTenantIsolationTest {
         when(judicialCaseRepository.findById(JUDICIAL_CASE_ID)).thenReturn(Optional.of(judicialCase(FIRM_A)));
 
         mockMvc.perform(get("/judicial-cases/{id}", JUDICIAL_CASE_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courtCaseNumber").value("J-1"));
     }
@@ -121,21 +122,21 @@ class JudicialControllerTenantIsolationTest {
         when(judicialCaseRepository.findById(JUDICIAL_CASE_ID)).thenReturn(Optional.of(judicialCase(FIRM_A)));
 
         mockMvc.perform(get("/judicial-cases/{id}", JUDICIAL_CASE_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/judicial-cases/{id}/events", JUDICIAL_CASE_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/judicial-cases/{id}/hearings", JUDICIAL_CASE_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
                                 "/judicial-cases/{id}/status", JUDICIAL_CASE_ID)
                         .param("status", "CLOSED")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
     }
 
@@ -143,11 +144,11 @@ class JudicialControllerTenantIsolationTest {
     void mismatchedQueryAndBodyTenantsAreForbidden() throws Exception {
         mockMvc.perform(get("/judicial-cases")
                         .param("lawFirmId", FIRM_A.toString())
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/judicial-cases")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"lawFirmId":"44444444-4444-4444-4444-444444444444","caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","courtId":"cccccccc-cccc-cccc-cccc-cccccccccccc","judgeId":"dddddddd-dddd-dddd-dddd-dddddddddddd","courtCaseNumber":"J-2","procedureType":"CIVIL","openingDate":"2026-09-01"}
@@ -157,7 +158,7 @@ class JudicialControllerTenantIsolationTest {
 
     @Test
     void missingTenantClaimIsForbidden() throws Exception {
-        mockMvc.perform(get("/judicial-cases").with(jwt()))
+        mockMvc.perform(get("/judicial-cases").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -178,13 +179,13 @@ class JudicialControllerTenantIsolationTest {
 
         mockMvc.perform(get("/judicial-cases")
                         .param("lawFirmId", FIRM_A.toString())
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].courtCaseNumber").value("J-1"))
                 .andExpect(jsonPath("$[1]").doesNotExist());
 
         mockMvc.perform(post("/judicial-cases")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","courtId":"cccccccc-cccc-cccc-cccc-cccccccccccc","judgeId":"dddddddd-dddd-dddd-dddd-dddddddddddd","courtCaseNumber":"J-3","procedureType":"CIVIL","openingDate":"2026-09-01"}
@@ -201,7 +202,7 @@ class JudicialControllerTenantIsolationTest {
         UUID missingJudgeId = UUID.fromString("22222222-2222-2222-2222-bbbbbbbbbbbb");
 
         mockMvc.perform(post("/judicial-cases")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","courtId":"11111111-1111-1111-1111-aaaaaaaaaaaa","judgeId":"22222222-2222-2222-2222-bbbbbbbbbbbb","courtCaseNumber":"J-MISSING-REF","procedureType":"CIVIL","openingDate":"2026-09-01"}
@@ -227,7 +228,7 @@ class JudicialControllerTenantIsolationTest {
                 .when(caseServiceOwnershipVerifier).verifyCaseBelongsToCurrentTenant(any());
 
         mockMvc.perform(post("/judicial-cases")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","courtId":"cccccccc-cccc-cccc-cccc-cccccccccccc","judgeId":"dddddddd-dddd-dddd-dddd-dddddddddddd","courtCaseNumber":"J-FOREIGN-CASE","procedureType":"CIVIL","openingDate":"2026-09-01"}
@@ -257,7 +258,7 @@ class JudicialControllerTenantIsolationTest {
                 .when(caseServiceOwnershipVerifier).verifyCaseBelongsToCurrentTenant(any());
 
         mockMvc.perform(post("/judicial-cases")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","courtId":"cccccccc-cccc-cccc-cccc-cccccccccccc","judgeId":"dddddddd-dddd-dddd-dddd-dddddddddddd","courtCaseNumber":"J-CASE-UNAVAILABLE","procedureType":"CIVIL","openingDate":"2026-09-01"}

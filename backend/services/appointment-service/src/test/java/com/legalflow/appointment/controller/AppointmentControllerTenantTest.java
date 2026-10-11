@@ -1,5 +1,6 @@
 package com.legalflow.appointment.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.legalflow.appointment.config.AppointmentSecurityConfig;
 import com.legalflow.appointment.domain.Appointment;
 import com.legalflow.appointment.domain.AppointmentStatus;
@@ -249,12 +250,12 @@ class AppointmentControllerTenantTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForA() {
-        return jwt().jwt(token -> token.subject("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_SECRETARY")).jwt(token -> token.subject("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
                 .claim("lawFirmId", FIRM_A.toString()));
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForB() {
-        return jwt().jwt(token -> token.subject("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_SECRETARY")).jwt(token -> token.subject("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
                 .claim("lawFirmId", FIRM_B.toString()));
     }
 }

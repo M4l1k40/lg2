@@ -1,5 +1,6 @@
 package com.legalflow.document.controller;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.legalflow.document.config.DocumentSecurityConfig;
 import com.legalflow.document.domain.Document;
 import com.legalflow.document.domain.DocumentVisibility;
@@ -56,7 +57,7 @@ class DocumentControllerTest {
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         mockMvc.perform(post("/documents")
-                        .with(jwt().jwt(token -> token
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token
                                 .subject(USER_ID.toString())
                                 .claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,7 +76,7 @@ class DocumentControllerTest {
                 .thenReturn(Optional.of(document(FIRM_A)));
 
         mockMvc.perform(get("/documents/{id}", DOCUMENT_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fileName").value("contract.pdf"));
     }
@@ -87,17 +88,17 @@ class DocumentControllerTest {
         when(documentRepository.findByIdAndLawFirmId(DOCUMENT_ID, FIRM_B)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/documents/{id}", DOCUMENT_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(put("/documents/{id}", DOCUMENT_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest()))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(delete("/documents/{id}", DOCUMENT_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isNotFound());
 
         verify(documentRepository, never()).save(any(Document.class));
@@ -112,7 +113,7 @@ class DocumentControllerTest {
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/documents/case/{caseId}", CASE_ID)
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_B.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
 
@@ -123,7 +124,7 @@ class DocumentControllerTest {
     @Test
     void invalidDocumentFieldsReturn400() throws Exception {
         mockMvc.perform(post("/documents")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"caseId":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","fileName":"","fileType":"application/pdf","fileSize":0,"storageKey":"key","visibility":"PRIVATE"}
@@ -144,7 +145,7 @@ class DocumentControllerTest {
                 .when(caseServiceOwnershipVerifier).verifyCaseBelongsToCurrentTenant(CASE_ID);
 
         mockMvc.perform(post("/documents")
-                        .with(jwt().jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.claim("lawFirmId", FIRM_A.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest()))
                 .andExpect(status().isUnprocessableEntity());

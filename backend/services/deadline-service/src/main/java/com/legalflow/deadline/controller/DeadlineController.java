@@ -1,5 +1,6 @@
 package com.legalflow.deadline.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.deadline.domain.Deadline;
 import com.legalflow.deadline.domain.DeadlineStatus;
 import com.legalflow.deadline.dto.DeadlineRequest;
@@ -23,11 +24,13 @@ public class DeadlineController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public List<Deadline> getDeadlines(@RequestParam(required = false) UUID lawFirmId) {
         return deadlineService.getDeadlines(lawFirmId);
     }
 
     @GetMapping("/approaching")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public List<Deadline> getApproachingDeadlines(
             @RequestParam(required = false) UUID lawFirmId,
             @RequestParam(defaultValue = "7") int days) {
@@ -36,26 +39,31 @@ public class DeadlineController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Deadline createDeadline(@Valid @RequestBody DeadlineRequest request) {
         return deadlineService.createDeadline(request);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public Deadline getDeadline(@PathVariable UUID id) {
         return deadlineService.getDeadline(id);
     }
 
     @GetMapping("/case/{caseId}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public List<Deadline> getDeadlinesByCase(@PathVariable UUID caseId) {
         return deadlineService.getDeadlinesByCase(caseId);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Deadline updateDeadline(@PathVariable UUID id, @Valid @RequestBody DeadlineRequest request) {
         return deadlineService.updateDeadline(id, request);
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Deadline updateStatus(@PathVariable UUID id,
                                  @RequestParam(required = false) String status,
                                  @RequestBody(required = false) DeadlineStatusRequest request) {
@@ -70,6 +78,7 @@ public class DeadlineController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public void deleteDeadline(@PathVariable UUID id) {
         deadlineService.deleteDeadline(id);
     }

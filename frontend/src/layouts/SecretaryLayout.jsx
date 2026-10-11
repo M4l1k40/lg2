@@ -8,6 +8,7 @@ const secretaryNav = [
   { to: '/secretary/lawyers', labelKey: 'secretary.nav.lawyers', label: 'Avocats' },
   { to: '/secretary/clients', labelKey: 'secretary.nav.clients', label: 'Clients' },
   { to: '/secretary/cases', labelKey: 'secretary.nav.cases', label: 'Dossiers' },
+  { to: '/secretary/consultations', labelKey: 'secretary.nav.consultations', label: 'Consultations' },
   { to: '/secretary/appointments', labelKey: 'secretary.nav.appointments', label: 'Rendez-vous' },
   { to: '/secretary/documents', labelKey: 'secretary.nav.documents', label: 'Documents' },
   { to: '/secretary/payments', labelKey: 'secretary.nav.payments', label: 'Paiements' },

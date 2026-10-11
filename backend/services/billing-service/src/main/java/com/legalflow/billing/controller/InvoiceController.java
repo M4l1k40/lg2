@@ -1,5 +1,6 @@
 package com.legalflow.billing.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.billing.domain.Invoice;
 import com.legalflow.billing.dto.InvoiceRequest;
 import com.legalflow.billing.service.InvoiceService;
@@ -31,27 +32,32 @@ public class InvoiceController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public List<Invoice> getInvoices(@RequestParam(required = false) UUID lawFirmId) {
         return invoiceService.getInvoices(lawFirmId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Invoice createInvoice(@Valid @RequestBody InvoiceRequest request) {
         return invoiceService.createInvoice(request);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER','CLIENT')")
     public Invoice getInvoice(@PathVariable UUID id) {
         return invoiceService.getInvoice(id);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','LAWYER')")
     public Invoice updateInvoice(@PathVariable UUID id, @Valid @RequestBody InvoiceRequest request) {
         return invoiceService.updateInvoice(id, request);
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public Invoice updateStatus(@PathVariable UUID id,
                                @RequestParam(required = false) String status,
                                @RequestBody(required = false) InvoiceRequest request) {
@@ -65,6 +71,7 @@ public class InvoiceController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN')")
     public void deleteInvoice(@PathVariable UUID id) {
         invoiceService.deleteInvoice(id);
     }

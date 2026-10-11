@@ -107,7 +107,11 @@ public class JudicialService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "lawFirmId query parameter does not match your tenant.");
         }
-        return judicialCaseRepository.findAllByLawFirmIdOrderByOpeningDateDesc(tenantId);
+        List<JudicialCase> judicialCases = judicialCaseRepository.findAllByLawFirmIdOrderByOpeningDateDesc(tenantId);
+        if (TenantContext.isStaff()) {
+            return judicialCases;
+        }
+        return judicialCases.stream().filter(this::visibleToCurrentUser).toList();
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +122,7 @@ public class JudicialService {
         if (!tenantId.equals(judicialCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + id);
         }
+        requireVisible(judicialCase, id);
         return judicialCase;
     }
 
@@ -194,6 +199,7 @@ public class JudicialService {
         if (!tenantId.equals(judicialCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + judicialCaseId);
         }
+        requireVisible(judicialCase, judicialCaseId);
         return hearingRepository.findAllByJudicialCase_IdOrderByDateTimeAsc(judicialCaseId);
     }
 
@@ -205,6 +211,7 @@ public class JudicialService {
         if (!tenantId.equals(judicialCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + judicialCaseId);
         }
+        requireVisible(judicialCase, judicialCaseId);
         return judicialEventRepository.findAllByJudicialCase_IdOrderByEventDateAsc(judicialCaseId);
     }
 
@@ -275,5 +282,27 @@ public class JudicialService {
     private boolean isValidHearingStatusTransition(HearingStatus current, HearingStatus next) {
         return current != null && next != null
                 && HEARING_TRANSITIONS.getOrDefault(current, Set.of()).contains(next);
+    }
+
+    /** Un CLIENT ne voit une affaire judiciaire que si le dossier correspondant lui appartient. */
+    private boolean visibleToCurrentUser(JudicialCase judicialCase) {
+        if (TenantContext.isStaff()) {
+            return true;
+        }
+        try {
+            caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(judicialCase.getCaseId());
+            return true;
+        } catch (ResponseStatusException exception) {
+            if (exception.getStatusCode().value() == HttpStatus.UNPROCESSABLE_ENTITY.value()) {
+                return false;
+            }
+            throw exception;
+        }
+    }
+
+    private void requireVisible(JudicialCase judicialCase, UUID id) {
+        if (!visibleToCurrentUser(judicialCase)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + id);
+        }
     }
 }

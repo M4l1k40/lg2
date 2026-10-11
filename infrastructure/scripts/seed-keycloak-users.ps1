@@ -1,6 +1,7 @@
 ﻿# Crée (ou met à jour) les utilisateurs de démonstration du cabinet A :
 #   - secretary-a / secretary-a  (rôle SECRETARY)
 #   - client-a    / client-a     (rôle CLIENT, lié à une fiche client du cabinet A)
+#   - lawyer-a2   / lawyer-a2    (rôle LAWYER, second avocat du cabinet A, pour tester l'isolation entre avocats)
 # Le script est idempotent : on peut le relancer sans risque.
 # Prérequis : backend démarré et ./configure-keycloak-user-profile.ps1 déjà exécuté.
 $ErrorActionPreference = 'Stop'
@@ -85,11 +86,13 @@ function Set-LegalFlowUser($Username, $Role, $FirstName, $LastName, $Attributes)
 
 Set-LegalFlowUser 'secretary-a' 'SECRETARY' 'Secretary' 'A' @{ lawFirmId = @($firmA) }
 Set-LegalFlowUser 'client-a' 'CLIENT' 'Client' 'A' @{ lawFirmId = @($firmA); clientId = @($clientRecord.id) }
+Set-LegalFlowUser 'lawyer-a2' 'LAWYER' 'Lawyer' 'A2' @{ lawFirmId = @($firmA) }
 
 # 3) Vérification : les claims présents dans les tokens
-foreach ($username in @('secretary-a', 'client-a')) {
+foreach ($username in @('lawyer-a', 'lawyer-a2', 'secretary-a', 'client-a')) {
     $token = Get-AccessToken $keycloakUrl $realm 'legalflow-frontend' $username $username
     $claims = ConvertFrom-JwtPayload $token
     Write-Output ("{0,-12} roles={1,-10} lawFirmId={2} clientId={3}" -f `
-        $claims.preferred_username, ($claims.realm_access.roles -join ','), $claims.lawFirmId, $claims.clientId)
+        $claims.preferred_username, (($claims.realm_access.roles | Where-Object { $_ -in 'ADMIN','LAWYER','SECRETARY','CLIENT' }) -join ','), $claims.lawFirmId, $claims.clientId)
+    Write-Output ("{0,-12} id (sub) = {1}" -f '', $claims.sub)
 }

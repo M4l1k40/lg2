@@ -10,6 +10,7 @@ const adminNav = [
   { to: '/admin/secretaries', labelKey: 'admin.nav.secretaries', label: 'Secrétaires' },
   { to: '/admin/clients', labelKey: 'admin.nav.clients', label: 'Clients' },
   { to: '/admin/cases', labelKey: 'admin.nav.cases', label: 'Dossiers' },
+  { to: '/admin/consultations', labelKey: 'admin.nav.consultations', label: 'Consultations' },
   { to: '/admin/billing', labelKey: 'admin.nav.billing', label: 'Facturation' },
   { to: '/admin/settings', labelKey: 'admin.nav.settings', label: 'Paramètres' }
 ];

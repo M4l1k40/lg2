@@ -7,6 +7,7 @@ const clientNav = [
   { to: '/client/dashboard', labelKey: 'client.nav.dashboard', label: 'Dashboard' },
   { to: '/client/profile', labelKey: 'client.nav.profile', label: 'Mon profil' },
   { to: '/client/cases', labelKey: 'client.nav.cases', label: 'Mes dossiers' },
+  { to: '/client/consultations', labelKey: 'client.nav.consultations', label: 'Mes consultations' },
   { to: '/client/documents', labelKey: 'client.nav.documents', label: 'Mes documents' },
   { to: '/client/judicial', labelKey: 'client.nav.judicial', label: 'Mes procédures' },
   { to: '/client/payments', labelKey: 'client.nav.payments', label: 'Mes paiements' },

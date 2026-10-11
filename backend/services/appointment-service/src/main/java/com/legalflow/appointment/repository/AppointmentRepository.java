@@ -13,5 +13,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
     List<Appointment> findAllByLawFirmIdAndCaseIdOrderByDateTimeAsc(UUID lawFirmId, UUID caseId);
 
+    List<Appointment> findAllByLawFirmIdAndLawyerIdOrderByDateTimeAsc(UUID lawFirmId, UUID lawyerId);
+
+    List<Appointment> findAllByLawFirmIdAndClientIdOrderByDateTimeAsc(UUID lawFirmId, UUID clientId);
+
     Optional<Appointment> findByIdAndLawFirmId(UUID id, UUID lawFirmId);
 }
