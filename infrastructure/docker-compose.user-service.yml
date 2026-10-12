@@ -1,0 +1,33 @@
+# Ajoute le user-service et la route de la gateway SANS modifier docker-compose.yml.
+# Utilisation (depuis la racine du projet) :
+#   docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.user-service.yml up -d --build user-service gateway
+# Pour l'intégrer définitivement : copier ces deux blocs dans docker-compose.yml.
+services:
+  user-service:
+    build:
+      context: ../backend/services/user-service
+      dockerfile: Dockerfile
+    container_name: legalflow-user-service
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      client-service:
+        condition: service_started
+    environment:
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: legalflow
+      KEYCLOAK_ADMIN_CLIENT_ID: legalflow-user-service
+      # Secret de développement : à remplacer par un vrai secret (fichier .env ignoré par git) en production.
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-dev-only-user-service-secret}
+      CLIENT_SERVICE_URL: http://client-service:8081
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
+  gateway:
+    depends_on:
+      - user-service
+    environment:
+      USER_SERVICE_URL: http://user-service:8090

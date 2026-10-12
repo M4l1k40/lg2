@@ -18,6 +18,7 @@ import LawyerCasesPage from './pages/lawyer/LawyerCasesPage';
 import LawyerConsultationsPage from './pages/lawyer/LawyerConsultationsPage';
 import ClientConsultationsPage from './pages/client/ClientConsultationsPage';
 import OfficeConsultationsPage from './pages/secretary/OfficeConsultationsPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 import SecretaryDashboardPage from './pages/secretary/SecretaryDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
@@ -79,9 +80,9 @@ export default function App() {
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="users" element={<PlaceholderPage titleKey="admin.nav.users" />} />
-                <Route path="lawyers" element={<PlaceholderPage titleKey="admin.nav.lawyers" />} />
-                <Route path="secretaries" element={<PlaceholderPage titleKey="admin.nav.secretaries" />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="lawyers" element={<AdminUsersPage initialRole="LAWYER" />} />
+                <Route path="secretaries" element={<AdminUsersPage initialRole="SECRETARY" />} />
                 <Route path="clients" element={<PlaceholderPage titleKey="admin.nav.clients" />} />
                 <Route path="cases" element={<PlaceholderPage titleKey="admin.nav.cases" />} />
                 <Route path="consultations" element={<OfficeConsultationsPage />} />

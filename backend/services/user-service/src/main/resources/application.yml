@@ -1,0 +1,26 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: legalflow-user-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs}
+
+legalflow:
+  keycloak:
+    # Le service n'a pas de base de données : Keycloak est la source de vérité des utilisateurs.
+    base-url: ${KEYCLOAK_BASE_URL:http://keycloak:8080}
+    realm: ${KEYCLOAK_REALM:legalflow}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:legalflow-user-service}
+    # Secret du compte de service Keycloak (voir configure-keycloak-user-service.ps1). Ne jamais le committer en production.
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -30,6 +30,8 @@ public class GatewayRoutesConfig {
                 .orElse("http://appointment-service:8083");
         String notificationServiceUrl = Optional.ofNullable(System.getenv("NOTIFICATION_SERVICE_URL"))
                 .orElse("http://notification-service:8087");
+        String userServiceUrl = Optional.ofNullable(System.getenv("USER_SERVICE_URL"))
+                .orElse("http://user-service:8090");
 
         return builder.routes()
                 .route("client-service", route -> route
@@ -80,6 +82,10 @@ public class GatewayRoutesConfig {
                         .path("/api/notifications/**")
                         .filters(filter -> filter.stripPrefix(1))
                         .uri(notificationServiceUrl))
+                .route("user-service", route -> route
+                        .path("/api/users/**")
+                        .filters(filter -> filter.stripPrefix(1))
+                        .uri(userServiceUrl))
                 .build();
     }
 }

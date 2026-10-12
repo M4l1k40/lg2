@@ -18,15 +18,15 @@ import {
 
 const EMPTY_FORM = { clientId: '', subject: '', description: '' };
 
-function AssignForm({ busy, knownLawyerIds, onSubmit }) {
+function AssignForm({ busy, lawyers, directoryAvailable, knownLawyerIds, onSubmit }) {
   const [lawyerId, setLawyerId] = useState('');
   const [error, setError] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
     const value = lawyerId.trim();
-    if (!UUID_REGEX.test(value)) {
-      setError("L'identifiant de l'avocat doit être un UUID valide.");
+    if (directoryAvailable ? !value : !UUID_REGEX.test(value)) {
+      setError(directoryAvailable ? 'Choisissez un avocat.' : "L'identifiant de l'avocat doit être un UUID valide.");
       return;
     }
     setError(null);
@@ -37,23 +37,45 @@ function AssignForm({ busy, knownLawyerIds, onSubmit }) {
   return (
     <form onSubmit={handleSubmit} noValidate className="flex w-full flex-col gap-2 sm:flex-row sm:items-start">
       <div className="flex-1">
-        <input
-          list="known-lawyers"
-          aria-label="Identifiant de l'avocat"
-          placeholder="Identifiant (UUID) de l'avocat à assigner"
-          className={inputClass}
-          value={lawyerId}
-          onChange={(event) => {
-            setLawyerId(event.target.value);
-            setError(null);
-          }}
-          disabled={busy}
-        />
-        <datalist id="known-lawyers">
-          {knownLawyerIds.map((id) => (
-            <option key={id} value={id} />
-          ))}
-        </datalist>
+        {directoryAvailable ? (
+          <select
+            aria-label="Avocat à assigner"
+            className={inputClass}
+            value={lawyerId}
+            onChange={(event) => {
+              setLawyerId(event.target.value);
+              setError(null);
+            }}
+            disabled={busy}
+          >
+            <option value="">— Choisir un avocat —</option>
+            {lawyers.map((lawyer) => (
+              <option key={lawyer.id} value={lawyer.id}>
+                {lawyer.firstName} {lawyer.lastName}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              list="known-lawyers"
+              aria-label="Identifiant de l'avocat"
+              placeholder="Annuaire indisponible : identifiant (UUID) de l'avocat"
+              className={inputClass}
+              value={lawyerId}
+              onChange={(event) => {
+                setLawyerId(event.target.value);
+                setError(null);
+              }}
+              disabled={busy}
+            />
+            <datalist id="known-lawyers">
+              {knownLawyerIds.map((id) => (
+                <option key={id} value={id} />
+              ))}
+            </datalist>
+          </>
+        )}
         {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
       </div>
       <button type="submit" className={primaryButton} disabled={busy}>
@@ -67,6 +89,7 @@ function AssignForm({ busy, knownLawyerIds, onSubmit }) {
 export default function OfficeConsultationsPage() {
   const consultationsApi = useApi('/api/consultations');
   const clientsApi = useApi('/api/clients');
+  const lawyersApi = useApi('/api/users/lawyers');
   const { busyKey, feedback, run, clearFeedback } = useAction();
 
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -93,6 +116,17 @@ export default function OfficeConsultationsPage() {
     });
     return names;
   }, [clients]);
+
+  const lawyers = useMemo(() => (Array.isArray(lawyersApi.data) ? lawyersApi.data : []), [lawyersApi.data]);
+  const directoryAvailable = !lawyersApi.loading && !lawyersApi.error && lawyers.length > 0;
+
+  const lawyerNames = useMemo(() => {
+    const names = {};
+    lawyers.forEach((lawyer) => {
+      names[lawyer.id] = `${lawyer.firstName} ${lawyer.lastName}`;
+    });
+    return names;
+  }, [lawyers]);
 
   const knownLawyerIds = useMemo(
     () => [...new Set(allConsultations.map((item) => item.lawyerId).filter(Boolean))],
@@ -274,11 +308,13 @@ export default function OfficeConsultationsPage() {
                   key={consultation.id}
                   consultation={consultation}
                   clientName={clientNames[consultation.clientId] || 'Client inconnu'}
-                  lawyerLabel={consultation.lawyerId ? `${consultation.lawyerId.slice(0, 8)}…` : null}
+                  lawyerLabel={consultation.lawyerId ? lawyerNames[consultation.lawyerId] || `${consultation.lawyerId.slice(0, 8)}…` : null}
                 >
                   {consultation.status === 'PENDING' ? (
                     <AssignForm
                       busy={busy}
+                      lawyers={lawyers}
+                      directoryAvailable={directoryAvailable}
                       knownLawyerIds={knownLawyerIds}
                       onSubmit={(lawyerId) => assign(consultation, lawyerId)}
                     />
