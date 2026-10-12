@@ -162,7 +162,7 @@ export default function LawyerConsultationsPage() {
                 <ConsultationCard
                   key={consultation.id}
                   consultation={consultation}
-                  clientName={clientNames[consultation.clientId] || 'Client inconnu'}
+                  clientName={clientNames[consultation.clientId] || 'Client à confirmer'}
                 >
                   {consultation.status === 'PENDING' ? (
                     <button type="button" className={primaryButton} disabled={busy} onClick={() => takeCharge(consultation)}>

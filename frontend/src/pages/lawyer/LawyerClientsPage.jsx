@@ -3,11 +3,14 @@ import PageHeader from '../../components/common/PageHeader';
 import SectionCard from '../../components/common/SectionCard';
 import AsyncState from '../../components/common/AsyncState';
 import FormField, { inputClass } from '../../components/common/FormField';
+import { primaryButton, secondaryButton } from '../../components/common/buttonStyles';
 import useApi from '../../hooks/useApi';
+import useAction from '../../hooks/useAction';
 import { api } from '../../services/api';
+import { keycloak } from '../../context/AuthContext';
 import { formatDate, sortByCreatedAtDesc } from '../../constants/caseStatus';
 
-const EMPTY_FORM = { firstName: '', lastName: '', email: '', phone: '', address: '' };
+const EMPTY_FORM = { firstName: '', lastName: '', email: '', phone: '', address: '', lawyerIds: [] };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validate(form) {
@@ -22,15 +25,53 @@ function validate(form) {
 function describeSubmitError(error) {
   if (error.status === 409) return error.message || 'Un client avec cet email existe déjà.';
   if (error.status === 400) return 'Les données saisies sont invalides.';
-  if (error.status === 403) return "Vous n'avez pas le droit de créer un client.";
+  if (error.status === 403) return "Vous n'avez pas le droit d'effectuer cette action.";
   if (error.status >= 500) {
     return `Erreur serveur (${error.status}). Vérifiez que le client-service est démarré (docker ps).`;
   }
-  return error.message || 'Impossible de créer le client.';
+  return error.message || "L'action a échoué.";
 }
 
+/** Choix des avocats en charge d'un client (administrateur et secrétaire). */
+function LawyerPicker({ lawyers, selected, onChange, disabled }) {
+  if (lawyers.length === 0) {
+    return (
+      <p className="text-sm text-slate-500">
+        Aucun avocat disponible. Créez d’abord des comptes avocats dans « Utilisateurs ».
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-4">
+      {lawyers.map((lawyer) => (
+        <label key={lawyer.id} className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={selected.includes(lawyer.id)}
+            disabled={disabled}
+            onChange={() =>
+              onChange(selected.includes(lawyer.id) ? selected.filter((id) => id !== lawyer.id) : [...selected, lawyer.id])
+            }
+          />
+          {lawyer.firstName} {lawyer.lastName}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Clients du cabinet.
+ * - Avocat : uniquement les clients dont il est en charge (un client qu'il crée lui est confié automatiquement).
+ * - Administrateur / secrétaire : tous les clients, avec désignation des avocats en charge.
+ */
 export default function LawyerClientsPage() {
+  const isOffice = Boolean(keycloak.hasRealmRole?.('ADMIN') || keycloak.hasRealmRole?.('SECRETARY'));
+
   const { data, loading, error, refetch } = useApi('/api/clients');
+  const lawyersApi = useApi('/api/users/lawyers', { enabled: isOffice });
+  const { busyKey, feedback, run, clearFeedback } = useAction();
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -39,6 +80,17 @@ export default function LawyerClientsPage() {
   const [submitError, setSubmitError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState(null);
+
+  const lawyers = useMemo(() => (Array.isArray(lawyersApi.data) ? lawyersApi.data : []), [lawyersApi.data]);
+
+  const lawyerNames = useMemo(() => {
+    const names = {};
+    lawyers.forEach((lawyer) => {
+      names[lawyer.id] = `${lawyer.firstName} ${lawyer.lastName}`;
+    });
+    return names;
+  }, [lawyers]);
 
   const clients = useMemo(() => {
     const list = sortByCreatedAtDesc(Array.isArray(data) ? data : []);
@@ -58,6 +110,7 @@ export default function LawyerClientsPage() {
     setShowForm(true);
     setSuccess(null);
     setSubmitError(null);
+    clearFeedback();
   }
 
   function closeForm() {
@@ -78,13 +131,17 @@ export default function LawyerClientsPage() {
     setSubmitError(null);
 
     try {
-      const created = await api.post('/api/clients', {
+      const body = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || null,
         address: form.address.trim() || null
-      });
+      };
+      // Un avocat devient automatiquement responsable du client qu'il crée ; l'administration désigne les avocats.
+      if (isOffice) body.lawyerIds = form.lawyerIds;
+
+      const created = await api.post('/api/clients', body);
       closeForm();
       setSuccess(`Client « ${created.firstName} ${created.lastName} » créé avec succès.`);
       refetch();
@@ -95,19 +152,34 @@ export default function LawyerClientsPage() {
     }
   }
 
+  async function saveLawyers() {
+    const ok = await run(
+      `lawyers-${editing.id}`,
+      () => api.put(`/api/clients/${editing.id}/lawyers`, { lawyerIds: editing.lawyerIds }),
+      'Avocats en charge mis à jour.',
+      describeSubmitError
+    );
+    if (ok) {
+      setEditing(null);
+      refetch();
+    }
+  }
+
+  const columnCount = isOffice ? 7 : 5;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Espace avocat"
+        eyebrow={isOffice ? 'Administration' : 'Espace avocat'}
         title="Clients"
-        description="Consultez les clients du cabinet et ajoutez-en de nouveaux."
+        description={
+          isOffice
+            ? "Tous les clients du cabinet. Désignez l'avocat en charge de chacun : il sera le seul avocat à le voir."
+            : 'Les clients dont vous êtes en charge. Un client que vous créez vous est automatiquement confié.'
+        }
         action={
           !showForm ? (
-            <button
-              type="button"
-              onClick={openForm}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-            >
+            <button type="button" onClick={openForm} className={primaryButton}>
               Nouveau client
             </button>
           ) : null
@@ -116,6 +188,18 @@ export default function LawyerClientsPage() {
 
       {success ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>
+      ) : null}
+
+      {feedback ? (
+        <div
+          className={`rounded-xl border p-3 text-sm ${
+            feedback.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-700'
+          }`}
+        >
+          {feedback.message}
+        </div>
       ) : null}
 
       {showForm ? (
@@ -170,24 +254,30 @@ export default function LawyerClientsPage() {
               />
             </FormField>
 
+            {isOffice ? (
+              <FormField
+                label="Avocat(s) en charge"
+                htmlFor="lawyerIds"
+                hint="Facultatif : sans avocat en charge, seuls l'administration et le secrétariat voient ce client."
+              >
+                <LawyerPicker
+                  lawyers={lawyers}
+                  selected={form.lawyerIds}
+                  onChange={(ids) => updateField('lawyerIds', ids)}
+                  disabled={submitting}
+                />
+              </FormField>
+            ) : null}
+
             {submitError ? (
               <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{submitError}</div>
             ) : null}
 
             <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              <button type="submit" disabled={submitting} className={primaryButton}>
                 {submitting ? 'Enregistrement…' : 'Enregistrer'}
               </button>
-              <button
-                type="button"
-                onClick={closeForm}
-                disabled={submitting}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
+              <button type="button" onClick={closeForm} disabled={submitting} className={secondaryButton}>
                 Annuler
               </button>
             </div>
@@ -212,32 +302,91 @@ export default function LawyerClientsPage() {
           error={error}
           onRetry={refetch}
           isEmpty={clients.length === 0}
-          emptyMessage={search ? 'Aucun client ne correspond à la recherche.' : 'Aucun client pour le moment.'}
+          emptyMessage={
+            search
+              ? 'Aucun client ne correspond à la recherche.'
+              : isOffice
+                ? 'Aucun client pour le moment.'
+                : "Aucun client ne vous est confié pour le moment. Créez-en un, ou demandez à l'administration de vous en confier."
+          }
           loadingMessage="Chargement des clients…"
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                   <th className="py-2 pr-4 font-medium">Nom</th>
                   <th className="py-2 pr-4 font-medium">Email</th>
                   <th className="py-2 pr-4 font-medium">Téléphone</th>
+                  {isOffice ? <th className="py-2 pr-4 font-medium">Avocat(s) en charge</th> : null}
                   <th className="py-2 pr-4 font-medium">Adresse</th>
-                  <th className="py-2 font-medium">Créé le</th>
+                  <th className="py-2 pr-4 font-medium">Créé le</th>
+                  {isOffice ? <th className="py-2 font-medium">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {clients.map((client) => (
-                  <tr key={client.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-3 pr-4 font-medium text-slate-800">
-                      {client.firstName} {client.lastName}
-                    </td>
-                    <td className="py-3 pr-4 text-slate-600">{client.email}</td>
-                    <td className="py-3 pr-4 text-slate-600">{client.phone || '—'}</td>
-                    <td className="py-3 pr-4 text-slate-600">{client.address || '—'}</td>
-                    <td className="py-3 text-slate-600">{formatDate(client.createdAt)}</td>
-                  </tr>
-                ))}
+                {clients.map((client) => {
+                  const assigned = Array.isArray(client.lawyerIds) ? client.lawyerIds : [];
+                  const isEditing = editing?.id === client.id;
+
+                  return [
+                    <tr key={client.id} className="border-b border-slate-100 align-top last:border-0">
+                      <td className="py-3 pr-4 font-medium text-slate-800">
+                        {client.firstName} {client.lastName}
+                      </td>
+                      <td className="py-3 pr-4 text-slate-600">{client.email}</td>
+                      <td className="py-3 pr-4 text-slate-600">{client.phone || '—'}</td>
+                      {isOffice ? (
+                        <td className="py-3 pr-4 text-slate-600">
+                          {assigned.length === 0
+                            ? 'Non confié'
+                            : assigned.map((id) => lawyerNames[id] || `${id.slice(0, 8)}…`).join(', ')}
+                        </td>
+                      ) : null}
+                      <td className="py-3 pr-4 text-slate-600">{client.address || '—'}</td>
+                      <td className="py-3 pr-4 text-slate-600">{formatDate(client.createdAt)}</td>
+                      {isOffice ? (
+                        <td className="py-3">
+                          <button
+                            type="button"
+                            className={secondaryButton}
+                            onClick={() => setEditing({ id: client.id, lawyerIds: assigned })}
+                          >
+                            Modifier
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>,
+                    isOffice && isEditing ? (
+                      <tr key={`${client.id}-editor`} className="border-b border-slate-100 bg-slate-50">
+                        <td colSpan={columnCount} className="space-y-3 px-4 py-4">
+                          <div className="text-sm font-medium text-slate-700">
+                            Avocat(s) en charge de {client.firstName} {client.lastName}
+                          </div>
+                          <LawyerPicker
+                            lawyers={lawyers}
+                            selected={editing.lawyerIds}
+                            onChange={(ids) => setEditing({ ...editing, lawyerIds: ids })}
+                            disabled={busyKey === `lawyers-${client.id}`}
+                          />
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              className={primaryButton}
+                              disabled={busyKey === `lawyers-${client.id}`}
+                              onClick={saveLawyers}
+                            >
+                              Enregistrer
+                            </button>
+                            <button type="button" className={secondaryButton} onClick={() => setEditing(null)}>
+                              Annuler
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null
+                  ];
+                })}
               </tbody>
             </table>
           </div>

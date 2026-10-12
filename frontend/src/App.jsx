@@ -66,7 +66,7 @@ export default function App() {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<SecretaryDashboardPage />} />
                 <Route path="lawyers" element={<PlaceholderPage titleKey="secretary.nav.lawyers" />} />
-                <Route path="clients" element={<PlaceholderPage titleKey="secretary.nav.clients" />} />
+                <Route path="clients" element={<LawyerClientsPage />} />
                 <Route path="cases" element={<PlaceholderPage titleKey="secretary.nav.cases" />} />
                 <Route path="consultations" element={<OfficeConsultationsPage />} />
                 <Route path="appointments" element={<PlaceholderPage titleKey="secretary.nav.appointments" />} />
@@ -83,7 +83,7 @@ export default function App() {
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="lawyers" element={<AdminUsersPage initialRole="LAWYER" />} />
                 <Route path="secretaries" element={<AdminUsersPage initialRole="SECRETARY" />} />
-                <Route path="clients" element={<PlaceholderPage titleKey="admin.nav.clients" />} />
+                <Route path="clients" element={<LawyerClientsPage />} />
                 <Route path="cases" element={<PlaceholderPage titleKey="admin.nav.cases" />} />
                 <Route path="consultations" element={<OfficeConsultationsPage />} />
                 <Route path="billing" element={<PlaceholderPage titleKey="admin.nav.billing" />} />
