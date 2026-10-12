@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $gatewayUrl = 'http://localhost:9000'
 $tokenUrl = 'http://localhost:8080/realms/legalflow/protocol/openid-connect/token'
 $firmA = '11111111-1111-1111-1111-111111111111'
@@ -140,7 +140,7 @@ try {
     Assert-Status $clientMismatch 403 'lawyer-b cannot create a client for firm A'
 
     $caseResponse = Invoke-Api Post '/api/cases' $headersA @{
-        clientId = $clientA.id; lawyerId = [guid]::NewGuid().ToString()
+        clientId = $clientA.id; lawyerId = $lawyerAClaims.sub
         reference = "CASE-A-$([guid]::NewGuid().ToString('N').Substring(0,8))"
         title = 'Firm A case'; description = 'Tenant isolation test'
     }
@@ -157,13 +157,13 @@ try {
     Assert-Status (Invoke-Api Get "/api/cases/$($caseA.id)/events" $headersB) 404 'lawyer-b cannot read firm A case events'
     Assert-Status (Invoke-Api Get "/api/cases?lawFirmId=$firmA" $headersB) 403 'lawyer-b cannot query cases for firm A'
     $caseMismatch = Invoke-Api Post '/api/cases' $headersB @{
-        lawFirmId = $firmA; clientId = $clientA.id; lawyerId = [guid]::NewGuid().ToString()
+        lawFirmId = $firmA; clientId = $clientA.id; lawyerId = $lawyerBClaims.sub
         reference = 'FORGED-CASE'; title = 'Forged case'
     }
     Assert-Status $caseMismatch 403 'lawyer-b cannot create a case for firm A'
 
     $foreignClientCase = Invoke-Api Post '/api/cases' $headersB @{
-        clientId = $clientA.id; lawyerId = [guid]::NewGuid().ToString()
+        clientId = $clientA.id; lawyerId = $lawyerBClaims.sub
         reference = 'CROSS-TENANT-CLIENT'; title = 'Foreign client should be rejected'
     }
     Assert-Status $foreignClientCase 422 'lawyer-b cannot attach lawyer-a client to a case'
@@ -176,7 +176,7 @@ try {
     if ($clientBResponse.StatusCode -ne 201) { throw "Firm B client setup failed: $($clientBResponse.Content)" }
     $clientB = ConvertFrom-Json -InputObject $clientBResponse.Content
     $caseBResponse = Invoke-Api Post '/api/cases' $headersB @{
-        clientId = $clientB.id; lawyerId = [guid]::NewGuid().ToString()
+        clientId = $clientB.id; lawyerId = $lawyerBClaims.sub
         reference = "CASE-B-$([guid]::NewGuid().ToString('N').Substring(0,8))"
         title = 'Firm B case'; description = 'Tenant isolation test'
     }

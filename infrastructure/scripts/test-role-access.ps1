@@ -73,7 +73,7 @@ Assert-Status 'CLIENT   POST /api/cases (interdit)' (Invoke-Api POST '/api/cases
 Assert-Status 'CLIENT   GET  /api/clients/me' (Invoke-Api GET '/api/clients/me' $client).Status 200
 Assert-Status 'CLIENT   GET  /api/clients/{sa fiche}' (Invoke-Api GET "/api/clients/$ownClientId" $client).Status 200
 
-$allClients = ConvertTo-Items (Invoke-Api GET '/api/clients' $lawyer).Json
+$allClients = ConvertTo-Items (Invoke-Api GET '/api/clients' $secretary).Json
 $otherClient = $allClients | Where-Object { $_.id -ne $ownClientId } | Select-Object -First 1
 if ($otherClient) {
     Assert-Status 'CLIENT   GET  /api/clients/{fiche d un autre}' (Invoke-Api GET "/api/clients/$($otherClient.id)" $client).Status 404
@@ -92,7 +92,7 @@ if ($foreignCases.Count -eq 0) {
     $script:failures++
 }
 
-$lawyerCases = ConvertTo-Items (Invoke-Api GET '/api/cases' $lawyer).Json
+$lawyerCases = ConvertTo-Items (Invoke-Api GET '/api/cases' $secretary).Json
 $foreignCase = $lawyerCases | Where-Object { $_.clientId -ne $ownClientId } | Select-Object -First 1
 if ($foreignCase) {
     Assert-Status 'CLIENT   GET  /api/cases/{dossier d un autre}' (Invoke-Api GET "/api/cases/$($foreignCase.id)" $client).Status 404

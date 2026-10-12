@@ -32,14 +32,17 @@ function ConvertFrom-JwtPayload($Token) {
     [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
 }
 
-# 1) Fiche client "Client A" dans le cabinet A (créée par lawyer-a via la gateway)
+# 1) Fiche client "Client A" dans le cabinet A : créée par l'administrateur, puis confiée à lawyer-a
+#    (un avocat ne voit que les clients dont il est en charge).
+$adminApiToken = Get-AccessToken $keycloakUrl $realm 'legalflow-frontend' 'admin' 'admin'
+$adminApiHeaders = @{ Authorization = "Bearer $adminApiToken" }
 $lawyerToken = Get-AccessToken $keycloakUrl $realm 'legalflow-frontend' 'lawyer-a' 'lawyer-a'
-$lawyerHeaders = @{ Authorization = "Bearer $lawyerToken" }
+$lawyerAId = (ConvertFrom-JwtPayload $lawyerToken).sub
 
-$clients = Get-Items "$gatewayUrl/api/clients" $lawyerHeaders
+$clients = Get-Items "$gatewayUrl/api/clients" $adminApiHeaders
 $clientRecord = $clients | Where-Object { $_.email -eq $clientEmail } | Select-Object -First 1
 if ($null -eq $clientRecord) {
-    $clientRecord = Invoke-RestMethod -Method Post -Uri "$gatewayUrl/api/clients" -Headers $lawyerHeaders `
+    $clientRecord = Invoke-RestMethod -Method Post -Uri "$gatewayUrl/api/clients" -Headers $adminApiHeaders `
         -ContentType 'application/json' `
         -Body (ConvertTo-Json -InputObject @{
             firstName = 'Client'; lastName = 'A'; email = $clientEmail; phone = '555-0100'; address = 'Cabinet A'
@@ -48,6 +51,9 @@ if ($null -eq $clientRecord) {
 } else {
     Write-Output "Fiche client existante : $($clientRecord.id)"
 }
+$null = Invoke-RestMethod -Method Put -Uri "$gatewayUrl/api/clients/$($clientRecord.id)/lawyers" -Headers $adminApiHeaders `
+    -ContentType 'application/json' -Body (ConvertTo-Json -InputObject @{ lawyerIds = @($lawyerAId) })
+Write-Output "lawyer-a est en charge de Client A."
 
 # 2) Utilisateurs Keycloak
 $adminToken = Get-AccessToken $keycloakUrl 'master' 'admin-cli' 'admin' 'admin'

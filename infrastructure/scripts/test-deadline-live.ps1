@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $gatewayUrl = 'http://localhost:9000'
 $tokenUrl = 'http://localhost:8080/realms/legalflow/protocol/openid-connect/token'
 $firmA = '11111111-1111-1111-1111-111111111111'
@@ -64,6 +64,13 @@ function Invoke-LiveApi {
     return $result
 }
 
+# Un avocat ne peut ouvrir un dossier que pour lui-même : on lit son identifiant (claim sub) dans son token.
+function Get-TokenSubject($Token) {
+    $payload = $Token.Split('.')[1].Replace('-', '+').Replace('_', '/')
+    while ($payload.Length % 4) { $payload += '=' }
+    ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json).sub
+}
+
 $tokenA = Get-FreshToken 'lawyer-a' 'lawyer-a'
 $tokenB = Get-FreshToken 'lawyer-b' 'lawyer-b'
 Write-Host 'Fresh lawyer-a and lawyer-b tokens obtained; token contents suppressed.'
@@ -80,7 +87,7 @@ $client = $clientResponse.Content | ConvertFrom-Json
 
 $caseResponse = Invoke-LiveApi 'setup-case-A' 'POST' '/api/cases' $tokenA @{
     clientId = $client.id
-    lawyerId = [guid]::NewGuid().ToString()
+    lawyerId = (Get-TokenSubject $tokenA)
     reference = "DL-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     title = 'Deadline live verification'
     description = 'Temporary live API verification'
