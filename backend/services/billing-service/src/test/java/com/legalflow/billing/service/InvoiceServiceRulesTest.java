@@ -55,12 +55,14 @@ class InvoiceServiceRulesTest {
     private static final UUID INVOICE_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     private InvoiceRepository repository;
+    private CaseServiceOwnershipVerifier verifier;
     private InvoiceService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(InvoiceRepository.class);
-        service = new InvoiceService(repository, mock(CaseServiceOwnershipVerifier.class));
+        verifier = mock(CaseServiceOwnershipVerifier.class);
+        service = new InvoiceService(repository, verifier);
     }
 
     @AfterEach
@@ -79,13 +81,42 @@ class InvoiceServiceRulesTest {
 
     @Test
     void staffSeesAllInvoicesOfTheFirm() {
-        for (String role : new String[] {"ADMIN", "LAWYER", "SECRETARY"}) {
+        for (String role : new String[] {"ADMIN", "SECRETARY"}) {
             authenticate(UUID.randomUUID(), null, role);
             service.getInvoices(null);
         }
 
-        verify(repository, org.mockito.Mockito.times(3)).findAllByLawFirmIdOrderByDueDateAsc(FIRM_A);
+        verify(repository, org.mockito.Mockito.times(2)).findAllByLawFirmIdOrderByDueDateAsc(FIRM_A);
         verify(repository, never()).findAllByLawFirmIdAndClientIdOrderByDueDateAsc(any(), any());
+    }
+
+    @Test
+    void lawyerSeesOnlyTheInvoicesOfTheCasesHeIsInChargeOf() {
+        UUID myCase = UUID.fromString("aaaa1111-aaaa-1111-aaaa-111111111111");
+        UUID otherCase = UUID.fromString("bbbb2222-bbbb-2222-bbbb-222222222222");
+        when(repository.findAllByLawFirmIdOrderByDueDateAsc(FIRM_A)).thenReturn(List.of(
+                invoiceForCase(myCase), invoiceForCase(otherCase)));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "case not found in your law firm"))
+                .when(verifier).verifyCaseBelongsToCurrentTenant(otherCase);
+
+        authenticate(UUID.randomUUID(), null, "LAWYER");
+        List<Invoice> visible = service.getInvoices(null);
+
+        assertEquals(1, visible.size());
+        assertEquals(myCase, visible.get(0).getCaseId());
+        verify(repository, never()).findAllByLawFirmIdAndClientIdOrderByDueDateAsc(any(), any());
+    }
+
+    @Test
+    void lawyerCannotReadAnInvoiceOfAnotherLawyersCase() {
+        when(repository.findByIdAndLawFirmId(INVOICE_ID, FIRM_A)).thenReturn(Optional.of(invoice(CLIENT_ID)));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "case not found in your law firm"))
+                .when(verifier).verifyCaseBelongsToCurrentTenant(any());
+
+        authenticate(UUID.randomUUID(), null, "LAWYER");
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.getInvoice(INVOICE_ID));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
     }
 
     @Test
@@ -109,6 +140,11 @@ class InvoiceServiceRulesTest {
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.getInvoices(null));
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+    private Invoice invoiceForCase(UUID caseId) {
+        return new Invoice(FIRM_A, caseId, CLIENT_ID, "INV-" + caseId.toString().substring(0, 4), "Honoraires", BigDecimal.TEN,
+                LocalDate.now().plusDays(10), InvoiceStatus.SENT, "creator");
     }
 
     private Invoice invoice(UUID clientId) {

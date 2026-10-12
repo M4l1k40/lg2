@@ -37,11 +37,15 @@ public class CaseService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "lawFirmId query parameter does not match your tenant.");
         }
-        if (!TenantContext.isStaff()) {
-            // Un utilisateur CLIENT ne voit que ses propres dossiers
-            return legalCaseRepository.findAllByLawFirmIdAndClientId(tenantId, TenantContext.requireClientId());
+        if (TenantContext.isOfficeStaff()) {
+            return legalCaseRepository.findAllByLawFirmId(tenantId);
         }
-        return legalCaseRepository.findAllByLawFirmId(tenantId);
+        if (TenantContext.isLawyer()) {
+            // Un avocat ne voit que les dossiers qui lui sont assignés.
+            return legalCaseRepository.findAllByLawFirmIdAndLawyerId(tenantId, TenantContext.requireUserId());
+        }
+        // Un utilisateur CLIENT ne voit que ses propres dossiers
+        return legalCaseRepository.findAllByLawFirmIdAndClientId(tenantId, TenantContext.requireClientId());
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +80,16 @@ public class CaseService {
                     "lawFirmId in request body does not match your tenant.");
         }
         legalCase.setLawFirmId(tenantId);
+        if (!TenantContext.isOfficeStaff()) {
+            // Un avocat ne peut ouvrir un dossier que pour lui-même : le dossier lui est assigné.
+            if (!TenantContext.isLawyer() || !TenantContext.requireUserId().equals(legalCase.getLawyerId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "A lawyer can only open cases assigned to themselves.");
+            }
+        }
         clientServiceOwnershipVerifier.verifyClientBelongsToCurrentTenant(legalCase.getClientId());
+        // L'avocat assigné doit être en charge du client (sinon il ne pourrait pas le voir).
+        clientServiceOwnershipVerifier.verifyLawyerInChargeOfClient(legalCase.getClientId(), legalCase.getLawyerId());
         // TODO: validate lawyerId once a user/lawyer directory service exists
         LegalCase savedCase = legalCaseRepository.save(legalCase);
         CaseEvent event = new CaseEvent(savedCase.getId(), "CASE_CREATED", "Case created", "system");
@@ -91,9 +104,15 @@ public class CaseService {
         return save(legalCase);
     }
 
-    /** Un CLIENT ne peut accéder qu'à ses propres dossiers (404 sinon, pour ne rien révéler). */
+    /** Avocat : ses dossiers ; client : ses dossiers ; 404 sinon, pour ne rien révéler. */
     private void requireVisibleToCurrentUser(LegalCase legalCase, UUID caseId) {
-        if (!TenantContext.isStaff() && !TenantContext.requireClientId().equals(legalCase.getClientId())) {
+        if (TenantContext.isOfficeStaff()) {
+            return;
+        }
+        boolean visible = TenantContext.isLawyer()
+                ? TenantContext.requireUserId().equals(legalCase.getLawyerId())
+                : TenantContext.requireClientId().equals(legalCase.getClientId());
+        if (!visible) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found: " + caseId);
         }
     }

@@ -144,6 +144,30 @@ class DocumentServiceVisibilityTest {
         verify(verifier).verifyCaseBelongsToCurrentTenant(CASE_ID);
     }
 
+    @Test
+    void lawyerCannotOpenDocumentsOfACaseThatIsNotTheirs() {
+        when(repository.findByIdAndLawFirmId(DOCUMENT_ID, FIRM_A))
+                .thenReturn(Optional.of(document(DocumentVisibility.CASE_MEMBERS, LAWYER_ID)));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "case not found in your law firm"))
+                .when(verifier).verifyCaseBelongsToCurrentTenant(CASE_ID);
+
+        authenticate(UUID.randomUUID(), null, "LAWYER");
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.getDocument(DOCUMENT_ID));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void secretaryOpensDocumentsWithoutCallingTheCaseService() {
+        when(repository.findByIdAndLawFirmId(DOCUMENT_ID, FIRM_A))
+                .thenReturn(Optional.of(document(DocumentVisibility.CASE_MEMBERS, LAWYER_ID)));
+
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+
+        assertEquals(DocumentVisibility.CASE_MEMBERS, service.getDocument(DOCUMENT_ID).getVisibility());
+        verify(verifier, never()).verifyCaseBelongsToCurrentTenant(any());
+    }
+
     private Document document(DocumentVisibility visibility, UUID uploadedBy) {
         return new Document(FIRM_A, CASE_ID, uploadedBy, "contract.pdf", "application/pdf", 245678L,
                 "documents/contract.pdf", "Client contract", visibility);

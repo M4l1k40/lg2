@@ -116,11 +116,31 @@ class JudicialClientVisibilityTest {
     }
 
     @Test
-    void staffSeesEverythingWithoutCallingTheCaseService() {
-        authenticate(UUID.randomUUID(), null, "LAWYER");
+    void officeStaffSeesEverythingWithoutCallingTheCaseService() {
+        authenticate(UUID.randomUUID(), null, "SECRETARY");
 
         assertEquals(2, service.findJudicialCasesByLawFirmId(null).size());
         verify(verifier, never()).verifyCaseBelongsToCurrentTenant(any());
+    }
+
+    @Test
+    void lawyerSeesOnlyTheJudicialCasesOfTheCasesHeCanSee() {
+        authenticate(UUID.randomUUID(), null, "LAWYER");
+
+        List<JudicialCase> visible = service.findJudicialCasesByLawFirmId(null);
+
+        assertEquals(1, visible.size());
+        assertEquals(MY_CASE_ID, visible.get(0).getCaseId());
+    }
+
+    @Test
+    void lawyerCannotOpenTheJudicialCaseOfAnotherLawyersCase() {
+        authenticate(UUID.randomUUID(), null, "LAWYER");
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.findJudicialCaseById(OTHER_JUDICIAL_ID));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
     }
 
     private JudicialCase judicialCase(UUID id, UUID caseId) {

@@ -40,7 +40,7 @@ public class DeadlineService {
     public List<Deadline> getDeadlines(UUID requestedLawFirmId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
-        return deadlineRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId);
+        return visibleToCurrentUser(deadlineRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId));
     }
 
     @Transactional(readOnly = true)
@@ -52,8 +52,8 @@ public class DeadlineService {
                     "days must be between 1 and 365.");
         }
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        return deadlineRepository.findAllByLawFirmIdAndStatusAndDueDateBetweenOrderByDueDateAsc(
-                lawFirmId, DeadlineStatus.PENDING, now, now.plusDays(days));
+        return visibleToCurrentUser(deadlineRepository.findAllByLawFirmIdAndStatusAndDueDateBetweenOrderByDueDateAsc(
+                lawFirmId, DeadlineStatus.PENDING, now, now.plusDays(days)));
     }
 
     @Transactional
@@ -77,9 +77,14 @@ public class DeadlineService {
     @Transactional(readOnly = true)
     public Deadline getDeadline(UUID id) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
-        return deadlineRepository.findByIdAndLawFirmId(id, lawFirmId)
+        Deadline deadline = deadlineRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Deadline not found: " + id));
+        if (!TenantContext.isOfficeStaff() && !isCaseVisibleToCurrentUser(deadline.getCaseId(), new java.util.HashMap<>())) {
+            // 404 plutôt que 403 : on ne révèle pas l'existence des échéances des dossiers des autres avocats.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Deadline not found: " + id);
+        }
+        return deadline;
     }
 
     @Transactional(readOnly = true)
@@ -138,5 +143,31 @@ public class DeadlineService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Requested lawFirmId does not match the authenticated law firm.");
         }
+    }
+
+    /** ADMIN/SECRETARY : tout le cabinet. Avocat : uniquement les échéances des dossiers qu'il peut voir. */
+    private List<Deadline> visibleToCurrentUser(List<Deadline> deadlines) {
+        if (TenantContext.isOfficeStaff()) {
+            return deadlines;
+        }
+        java.util.Map<UUID, Boolean> visibleCases = new java.util.HashMap<>();
+        return deadlines.stream()
+                .filter(deadline -> isCaseVisibleToCurrentUser(deadline.getCaseId(), visibleCases))
+                .toList();
+    }
+
+    /** Un dossier est visible pour l'avocat courant si le case-service l'accepte (422 sinon). */
+    private boolean isCaseVisibleToCurrentUser(UUID caseId, java.util.Map<UUID, Boolean> cache) {
+        return cache.computeIfAbsent(caseId, id -> {
+            try {
+                caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(id);
+                return true;
+            } catch (ResponseStatusException exception) {
+                if (exception.getStatusCode().value() == HttpStatus.UNPROCESSABLE_ENTITY.value()) {
+                    return false;
+                }
+                throw exception;
+            }
+        });
     }
 }

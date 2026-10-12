@@ -1,6 +1,7 @@
 package com.legalflow.client.controller;
 
 import com.legalflow.client.domain.Client;
+import com.legalflow.client.dto.ClientLawyersRequest;
 import com.legalflow.client.service.ClientService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -46,5 +47,12 @@ public class ClientController {
     @PreAuthorize("hasAnyRole('ADMIN','LAWYER','SECRETARY')")
     public Client create(@Valid @RequestBody Client client) {
         return clientService.save(client);
+    }
+
+    /** Désigne les avocats en charge du client (administrateur ou secrétaire). */
+    @PutMapping("/{id}/lawyers")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY')")
+    public Client updateLawyers(@PathVariable UUID id, @Valid @RequestBody ClientLawyersRequest request) {
+        return clientService.updateLawyers(id, request.lawyerIds());
     }
 }

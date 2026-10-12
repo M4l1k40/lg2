@@ -37,6 +37,8 @@ class ClientControllerTest {
     private static final UUID FIRM_A = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID FIRM_B = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID CLIENT_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID LAWYER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID OTHER_LAWYER_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID OTHER_CLIENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
     @Autowired
@@ -221,8 +223,92 @@ class ClientControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    private static JwtRequestPostProcessor staff(UUID lawFirmId) {
+    @Test
+    void lawyerSeesOnlyTheClientsHeIsInChargeOf() throws Exception {
+        Client mine = client(FIRM_A);
+        mine.setLawyerIds(java.util.Set.of(LAWYER_ID));
+        when(clientRepository.findAllByLawFirmIdAndLawyerId(FIRM_A, LAWYER_ID)).thenReturn(java.util.List.of(mine));
+
+        mockMvc.perform(get("/clients").with(lawyerUser(FIRM_A, LAWYER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("client@example.test"))
+                .andExpect(jsonPath("$[1]").doesNotExist());
+
+        verify(clientRepository, never()).findAllByLawFirmId(any());
+    }
+
+    @Test
+    void aNewLawyerSeesNoClientAtAll() throws Exception {
+        mockMvc.perform(get("/clients").with(lawyerUser(FIRM_A, OTHER_LAWYER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").doesNotExist());
+    }
+
+    @Test
+    void lawyerCannotReadAClientHeIsNotInChargeOf() throws Exception {
+        Client someoneElses = client(FIRM_A);
+        someoneElses.setLawyerIds(java.util.Set.of(OTHER_LAWYER_ID));
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(someoneElses));
+        mockMvc.perform(get("/clients/{id}", CLIENT_ID).with(lawyerUser(FIRM_A, LAWYER_ID)))
+                .andExpect(status().isNotFound());
+
+        Client mine = client(FIRM_A);
+        mine.setLawyerIds(java.util.Set.of(LAWYER_ID));
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(mine));
+        mockMvc.perform(get("/clients/{id}", CLIENT_ID).with(lawyerUser(FIRM_A, LAWYER_ID)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aLawyerWhoCreatesAClientBecomesTheOnlyLawyerInChargeOfIt() throws Exception {
+        when(clientRepository.save(any(Client.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(post("/clients").with(lawyerUser(FIRM_A, LAWYER_ID)).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Nour","lastName":"Test","email":"nour@example.test","lawyerIds":["cccccccc-cccc-cccc-cccc-cccccccccccc"]}
+                                """))
+                .andExpect(status().isCreated());
+
+        org.mockito.ArgumentCaptor<Client> captor = org.mockito.ArgumentCaptor.forClass(Client.class);
+        verify(clientRepository).save(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.Set.of(LAWYER_ID), captor.getValue().getLawyerIds());
+    }
+
+    @Test
+    void officeStaffAssignsLawyersToAClient() throws Exception {
+        Client existing = client(FIRM_A);
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(existing));
+        when(clientRepository.save(any(Client.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/clients/{id}/lawyers", CLIENT_ID)
+                        .with(staff(FIRM_A)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lawyerIds\":[\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\"]}"))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.Set.of(LAWYER_ID), existing.getLawyerIds());
+    }
+
+    @Test
+    void lawyersAndClientsCannotAssignLawyers() throws Exception {
+        String body = "{\"lawyerIds\":[\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\"]}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/clients/{id}/lawyers", CLIENT_ID)
+                        .with(lawyerUser(FIRM_A, LAWYER_ID)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/clients/{id}/lawyers", CLIENT_ID)
+                        .with(clientUser(FIRM_A, CLIENT_ID)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+
+        verify(clientRepository, never()).save(any(Client.class));
+    }
+
+    private static JwtRequestPostProcessor lawyerUser(UUID lawFirmId, UUID lawyerId) {
         return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))
+                .jwt(token -> token.subject(lawyerId.toString()).claim("lawFirmId", lawFirmId.toString()));
+    }
+
+    private static JwtRequestPostProcessor staff(UUID lawFirmId) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_SECRETARY"))
                 .jwt(token -> token.claim("lawFirmId", lawFirmId.toString()));
     }
 

@@ -42,6 +42,33 @@ public final class TenantContext {
         return false;
     }
 
+    public static boolean isOfficeStaff() {
+        return hasRole("ADMIN") || hasRole("SECRETARY");
+    }
+
+    public static boolean isLawyer() {
+        return hasRole("LAWYER");
+    }
+
+    /** Identifiant Keycloak (claim sub, au format UUID) de l'utilisateur connecté. */
+    public static UUID requireUserId() {
+        return requireUuidClaim("sub");
+    }
+
+    private static boolean hasRole(String role) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        String expected = "ROLE_" + role;
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            if (expected.equals(authority.getAuthority())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static UUID requireUuidClaim(String claimName) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthenticationToken)) {

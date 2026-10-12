@@ -42,6 +42,8 @@ class CaseControllerTenantIsolationTest {
     private static final UUID FIRM_B = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID CASE_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID CLIENT_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+    private static final UUID LAWYER_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID OTHER_LAWYER_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final UUID OTHER_CLIENT_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
     @Autowired
@@ -224,8 +226,67 @@ class CaseControllerTenantIsolationTest {
                 .andExpect(status().isForbidden());
     }
 
-    private static JwtRequestPostProcessor staff(UUID lawFirmId) {
+    @Test
+    void lawyerSeesOnlyTheCasesAssignedToHim() throws Exception {
+        when(legalCaseRepository.findAllByLawFirmIdAndLawyerId(FIRM_A, LAWYER_ID))
+                .thenReturn(List.of(legalCase(FIRM_A, CLIENT_ID)));
+
+        mockMvc.perform(get("/cases").with(lawyerUser(FIRM_A, LAWYER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].reference").value("CASE-1"))
+                .andExpect(jsonPath("$[1]").doesNotExist());
+
+        verify(legalCaseRepository, never()).findAllByLawFirmId(any());
+    }
+
+    @Test
+    void lawyerCannotReadAnotherLawyersCase() throws Exception {
+        LegalCase assignedToSomeoneElse = new LegalCase(FIRM_A, CLIENT_ID, OTHER_LAWYER_ID, "CASE-9", "Other", "Desc", CaseStatus.OPEN);
+        when(legalCaseRepository.findById(CASE_ID)).thenReturn(Optional.of(assignedToSomeoneElse));
+
+        mockMvc.perform(get("/cases/{id}", CASE_ID).with(lawyerUser(FIRM_A, LAWYER_ID))).andExpect(status().isNotFound());
+        mockMvc.perform(get("/cases/{id}/events", CASE_ID).with(lawyerUser(FIRM_A, LAWYER_ID))).andExpect(status().isNotFound());
+
+        LegalCase mine = new LegalCase(FIRM_A, CLIENT_ID, LAWYER_ID, "CASE-1", "Mine", "Desc", CaseStatus.OPEN);
+        when(legalCaseRepository.findById(CASE_ID)).thenReturn(Optional.of(mine));
+        mockMvc.perform(get("/cases/{id}", CASE_ID).with(lawyerUser(FIRM_A, LAWYER_ID))).andExpect(status().isOk());
+    }
+
+    @Test
+    void lawyerCanOnlyOpenCasesAssignedToHimself() throws Exception {
+        when(legalCaseRepository.save(any(LegalCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        String forSomeoneElse = "{\"clientId\":\"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee\",\"lawyerId\":\"cccccccc-cccc-cccc-cccc-cccccccccccc\",\"reference\":\"CASE-X\",\"title\":\"Not mine\"}";
+        String forMyself = "{\"clientId\":\"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee\",\"lawyerId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"reference\":\"CASE-Y\",\"title\":\"Mine\"}";
+
+        mockMvc.perform(post("/cases").with(lawyerUser(FIRM_A, LAWYER_ID)).contentType(MediaType.APPLICATION_JSON).content(forSomeoneElse))
+                .andExpect(status().isForbidden());
+        verify(legalCaseRepository, never()).save(any(LegalCase.class));
+
+        mockMvc.perform(post("/cases").with(lawyerUser(FIRM_A, LAWYER_ID)).contentType(MediaType.APPLICATION_JSON).content(forMyself))
+                .andExpect(status().isCreated());
+        verify(clientServiceOwnershipVerifier).verifyLawyerInChargeOfClient(CLIENT_ID, LAWYER_ID);
+    }
+
+    @Test
+    void officeStaffMustAssignALawyerWhoIsInChargeOfTheClient() throws Exception {
+        org.mockito.Mockito.doThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "The assigned lawyer is not in charge of this client."))
+                .when(clientServiceOwnershipVerifier).verifyLawyerInChargeOfClient(any(), any());
+
+        mockMvc.perform(post("/cases").with(staff(FIRM_A)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientId\":\"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee\",\"lawyerId\":\"cccccccc-cccc-cccc-cccc-cccccccccccc\",\"reference\":\"CASE-Z\",\"title\":\"Needs assignment\"}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        verify(legalCaseRepository, never()).save(any(LegalCase.class));
+    }
+
+    private static JwtRequestPostProcessor lawyerUser(UUID lawFirmId, UUID lawyerId) {
         return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))
+                .jwt(token -> token.subject(lawyerId.toString()).claim("lawFirmId", lawFirmId.toString()));
+    }
+
+    private static JwtRequestPostProcessor staff(UUID lawFirmId) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_SECRETARY"))
                 .jwt(token -> token.claim("lawFirmId", lawFirmId.toString()));
     }
 

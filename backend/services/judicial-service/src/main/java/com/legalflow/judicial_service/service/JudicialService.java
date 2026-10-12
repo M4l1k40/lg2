@@ -108,7 +108,7 @@ public class JudicialService {
                     "lawFirmId query parameter does not match your tenant.");
         }
         List<JudicialCase> judicialCases = judicialCaseRepository.findAllByLawFirmIdOrderByOpeningDateDesc(tenantId);
-        if (TenantContext.isStaff()) {
+        if (TenantContext.isOfficeStaff()) {
             return judicialCases;
         }
         return judicialCases.stream().filter(this::visibleToCurrentUser).toList();
@@ -284,9 +284,9 @@ public class JudicialService {
                 && HEARING_TRANSITIONS.getOrDefault(current, Set.of()).contains(next);
     }
 
-    /** Un CLIENT ne voit une affaire judiciaire que si le dossier correspondant lui appartient. */
+    /** Un avocat ou un client ne voit une affaire judiciaire que si le dossier correspondant lui est accessible (le case-service décide). */
     private boolean visibleToCurrentUser(JudicialCase judicialCase) {
-        if (TenantContext.isStaff()) {
+        if (TenantContext.isOfficeStaff()) {
             return true;
         }
         try {

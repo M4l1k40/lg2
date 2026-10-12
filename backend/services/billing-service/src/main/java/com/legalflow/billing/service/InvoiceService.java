@@ -40,12 +40,18 @@ public class InvoiceService {
     public List<Invoice> getInvoices(UUID requestedLawFirmId) {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         rejectMismatchedTenant(requestedLawFirmId, lawFirmId);
-        if (!TenantContext.isStaff()) {
-            // Un CLIENT ne voit que ses propres factures.
-            return invoiceRepository.findAllByLawFirmIdAndClientIdOrderByDueDateAsc(
-                    lawFirmId, TenantContext.requireClientId());
+        if (TenantContext.isOfficeStaff()) {
+            return invoiceRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId);
         }
-        return invoiceRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId);
+        if (TenantContext.isLawyer()) {
+            // Un avocat ne voit que les factures des dossiers dont il a la charge (le case-service décide).
+            java.util.Map<UUID, Boolean> visibleCases = new java.util.HashMap<>();
+            return invoiceRepository.findAllByLawFirmIdOrderByDueDateAsc(lawFirmId).stream()
+                    .filter(invoice -> isCaseVisibleToCurrentUser(invoice.getCaseId(), visibleCases))
+                    .toList();
+        }
+        // Un CLIENT ne voit que ses propres factures.
+        return invoiceRepository.findAllByLawFirmIdAndClientIdOrderByDueDateAsc(lawFirmId, TenantContext.requireClientId());
     }
 
     @Transactional
@@ -78,11 +84,31 @@ public class InvoiceService {
         UUID lawFirmId = TenantContext.requireLawFirmId();
         Invoice invoice = invoiceRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id));
-        if (!TenantContext.isStaff() && !TenantContext.requireClientId().equals(invoice.getClientId())) {
-            // 404 plutôt que 403 : on ne révèle pas l'existence des factures des autres clients.
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id);
+        if (!TenantContext.isOfficeStaff()) {
+            boolean visible = TenantContext.isLawyer()
+                    ? isCaseVisibleToCurrentUser(invoice.getCaseId(), new java.util.HashMap<>())
+                    : TenantContext.requireClientId().equals(invoice.getClientId());
+            if (!visible) {
+                // 404 plutôt que 403 : on ne révèle pas l'existence des factures des autres.
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invoice not found: " + id);
+            }
         }
         return invoice;
+    }
+
+    /** Un dossier est visible pour l'avocat courant si le case-service l'accepte (422 sinon). */
+    private boolean isCaseVisibleToCurrentUser(UUID caseId, java.util.Map<UUID, Boolean> cache) {
+        return cache.computeIfAbsent(caseId, id -> {
+            try {
+                caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(id);
+                return true;
+            } catch (ResponseStatusException exception) {
+                if (exception.getStatusCode().value() == HttpStatus.UNPROCESSABLE_ENTITY.value()) {
+                    return false;
+                }
+                throw exception;
+            }
+        });
     }
 
     @Transactional

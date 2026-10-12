@@ -51,8 +51,8 @@ public class DocumentService {
         Document document = documentRepository.findByIdAndLawFirmId(id, lawFirmId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Document not found: " + id));
-        if (!TenantContext.isStaff()) {
-            // Un CLIENT n'accède qu'aux documents partagés d'un dossier qui lui appartient.
+        if (!TenantContext.isOfficeStaff()) {
+            // Un avocat ou un client n'accède qu'aux documents d'un dossier qu'il peut voir (le case-service décide).
             try {
                 caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(document.getCaseId());
             } catch (ResponseStatusException exception) {

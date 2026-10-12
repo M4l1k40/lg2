@@ -11,4 +11,6 @@ public interface LegalCaseRepository extends JpaRepository<LegalCase, UUID> {
     List<LegalCase> findAllByLawFirmId(UUID lawFirmId);
 
     List<LegalCase> findAllByLawFirmIdAndClientId(UUID lawFirmId, UUID clientId);
+
+    List<LegalCase> findAllByLawFirmIdAndLawyerId(UUID lawFirmId, UUID lawyerId);
 }

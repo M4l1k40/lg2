@@ -40,6 +40,12 @@ public class Client {
     @Column(length = 500)
     private String address;
 
+    /** Avocats en charge du client : seuls eux (et le personnel administratif) peuvent le voir. */
+    @jakarta.persistence.ElementCollection(fetch = jakarta.persistence.FetchType.EAGER)
+    @jakarta.persistence.CollectionTable(name = "client_lawyers", joinColumns = @jakarta.persistence.JoinColumn(name = "client_id"))
+    @Column(name = "lawyer_id", nullable = false)
+    private java.util.Set<UUID> lawyerIds = new java.util.HashSet<>();
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -110,6 +116,14 @@ public class Client {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public java.util.Set<UUID> getLawyerIds() {
+        return lawyerIds;
+    }
+
+    public void setLawyerIds(java.util.Set<UUID> lawyerIds) {
+        this.lawyerIds = lawyerIds == null ? new java.util.HashSet<>() : new java.util.HashSet<>(lawyerIds);
     }
 
     public LocalDateTime getCreatedAt() {
