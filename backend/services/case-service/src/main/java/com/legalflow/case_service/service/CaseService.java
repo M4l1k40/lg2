@@ -4,6 +4,7 @@ import com.legalflow.case_service.domain.CaseEvent;
 import com.legalflow.case_service.domain.CaseStatus;
 import com.legalflow.case_service.domain.LegalCase;
 import com.legalflow.case_service.integration.ClientServiceOwnershipVerifier;
+import com.legalflow.case_service.messaging.CaseEventPublisher;
 import com.legalflow.case_service.repository.CaseEventRepository;
 import com.legalflow.case_service.repository.LegalCaseRepository;
 import com.legalflow.case_service.security.TenantContext;
@@ -21,13 +22,16 @@ public class CaseService {
     private final LegalCaseRepository legalCaseRepository;
     private final CaseEventRepository caseEventRepository;
     private final ClientServiceOwnershipVerifier clientServiceOwnershipVerifier;
+    private final CaseEventPublisher caseEventPublisher;
 
     public CaseService(LegalCaseRepository legalCaseRepository,
                        CaseEventRepository caseEventRepository,
-                       ClientServiceOwnershipVerifier clientServiceOwnershipVerifier) {
+                       ClientServiceOwnershipVerifier clientServiceOwnershipVerifier,
+                       CaseEventPublisher caseEventPublisher) {
         this.legalCaseRepository = legalCaseRepository;
         this.caseEventRepository = caseEventRepository;
         this.clientServiceOwnershipVerifier = clientServiceOwnershipVerifier;
+        this.caseEventPublisher = caseEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +99,7 @@ public class CaseService {
         CaseEvent event = new CaseEvent(savedCase.getId(), "CASE_CREATED", "Case created", "system");
         savedCase.addEvent(event);
         caseEventRepository.save(event);
+        caseEventPublisher.caseCreated(savedCase);
         return savedCase;
     }
 

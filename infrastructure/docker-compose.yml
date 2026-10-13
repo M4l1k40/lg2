@@ -132,6 +132,8 @@ services:
     build:
       context: ../backend/services/case-service
       dockerfile: Dockerfile
+      additional_contexts:
+        events: ./legalflow-events
     container_name: legalflow-case-service
     depends_on:
       case-db:

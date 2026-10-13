@@ -42,6 +42,7 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_DEFAULT_USER:legalflow}
     password: ${RABBITMQ_DEFAULT_PASS:replace-with-rabbitmq-password}
+    connection-timeout: 2s   # ne pas bloquer la réponse HTTP si le broker est injoignable
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -55,6 +56,9 @@ mvn -f infrastructure/legalflow-events/pom.xml install
 ```
 
 À refaire après toute modification de la bibliothèque, avant de lancer `mvn test` dans un service.
+
+Dans `management`, désactiver l'indicateur de santé RabbitMQ d'un publisher (`management.health.rabbit.enabled: false`) :
+la publication est best-effort et ne doit pas rendre le service « DOWN ».
 
 ## Brancher un service publisher (3 changements dans le service, le reste est dans `infrastructure/`)
 

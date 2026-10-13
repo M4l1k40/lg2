@@ -4,6 +4,7 @@ import com.legalflow.case_service.config.CaseSecurityConfig;
 import com.legalflow.case_service.domain.CaseStatus;
 import com.legalflow.case_service.domain.LegalCase;
 import com.legalflow.case_service.integration.ClientServiceOwnershipVerifier;
+import com.legalflow.case_service.messaging.CaseEventPublisher;
 import com.legalflow.case_service.repository.CaseEventRepository;
 import com.legalflow.case_service.repository.LegalCaseRepository;
 import com.legalflow.case_service.service.CaseService;
@@ -57,6 +58,9 @@ class CaseControllerTenantIsolationTest {
 
         @MockBean
         private ClientServiceOwnershipVerifier clientServiceOwnershipVerifier;
+
+    @MockBean
+    private CaseEventPublisher caseEventPublisher;
 
     @Test
     void ownTenantCanReadCase() throws Exception {
@@ -278,6 +282,18 @@ class CaseControllerTenantIsolationTest {
                 .andExpect(status().isUnprocessableEntity());
 
         verify(legalCaseRepository, never()).save(any(LegalCase.class));
+        verify(caseEventPublisher, never()).caseCreated(any(LegalCase.class));
+    }
+
+    @Test
+    void openingACasePublishesCaseCreatedOnlyOnSuccess() throws Exception {
+        when(legalCaseRepository.save(any(LegalCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        String forMyself = "{\"clientId\":\"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee\",\"lawyerId\":\"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\",\"reference\":\"CASE-E\",\"title\":\"Event\"}";
+
+        mockMvc.perform(post("/cases").with(lawyerUser(FIRM_A, LAWYER_ID)).contentType(MediaType.APPLICATION_JSON).content(forMyself))
+                .andExpect(status().isCreated());
+
+        verify(caseEventPublisher).caseCreated(any(LegalCase.class));
     }
 
     private static JwtRequestPostProcessor lawyerUser(UUID lawFirmId, UUID lawyerId) {
