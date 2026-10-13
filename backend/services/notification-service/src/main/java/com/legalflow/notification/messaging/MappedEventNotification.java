@@ -1,5 +1,6 @@
 package com.legalflow.notification.messaging;
 
+import com.legalflow.events.EventRecipient;
 import com.legalflow.notification.domain.NotificationType;
 
 import java.util.List;

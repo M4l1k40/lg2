@@ -1,5 +1,7 @@
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
+COPY --from=events . /events
+RUN mvn -q -DskipTests -f /events/pom.xml install
 COPY pom.xml ./
 RUN mvn -q -DskipTests dependency:go-offline
 COPY src ./src

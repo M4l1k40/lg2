@@ -1,5 +1,6 @@
 package com.legalflow.notification.config;
 
+import com.legalflow.events.EventsTopology;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Declarables;
@@ -15,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitNotificationConfig {
 
-    public static final String EVENTS_EXCHANGE = "legalflow.events";
+    public static final String EVENTS_EXCHANGE = EventsTopology.EVENTS_EXCHANGE;
     public static final String NOTIFICATION_QUEUE = "legalflow.notification.queue";
     public static final String NOTIFICATION_DLX = "legalflow.notification.dlx";
     public static final String NOTIFICATION_DLQ = "legalflow.notification.dlq";

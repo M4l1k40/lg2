@@ -1,5 +1,7 @@
 package com.legalflow.notification.messaging;
 
+import com.legalflow.events.DomainEventEnvelope;
+import com.legalflow.events.EventRecipient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.legalflow.notification.domain.NotificationRecipientType;
 import com.legalflow.notification.domain.NotificationType;

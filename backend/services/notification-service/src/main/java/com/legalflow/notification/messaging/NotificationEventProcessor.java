@@ -1,5 +1,7 @@
 package com.legalflow.notification.messaging;
 
+import com.legalflow.events.DomainEventEnvelope;
+import com.legalflow.events.EventRecipient;
 import com.legalflow.notification.domain.Notification;
 import com.legalflow.notification.domain.NotificationChannel;
 import com.legalflow.notification.domain.NotificationRecipientType;

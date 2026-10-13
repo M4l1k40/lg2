@@ -432,6 +432,8 @@ services:
     build:
       context: ../backend/services/notification-service
       dockerfile: Dockerfile
+      additional_contexts:
+        events: ./legalflow-events
     container_name: legalflow-notification-service
     depends_on:
       notification-db:

@@ -1,5 +1,6 @@
 package com.legalflow.notification.messaging;
 
+import com.legalflow.events.DomainEventEnvelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
