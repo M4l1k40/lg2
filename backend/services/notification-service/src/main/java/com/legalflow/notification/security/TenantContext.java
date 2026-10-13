@@ -31,7 +31,34 @@ public final class TenantContext {
         }
     }
 
+    /**
+     * Identifiant sous lequel les notifications de l'utilisateur courant sont rangées :
+     * le claim {@code clientId} (fiche client) pour un CLIENT, le {@code sub} Keycloak pour le personnel.
+     */
     public static UUID requireRecipientId() {
+        boolean client = hasAuthority("ROLE_CLIENT");
+        boolean staff = hasAuthority("ROLE_LAWYER") || hasAuthority("ROLE_SECRETARY")
+                || hasAuthority("ROLE_ADMIN");
+        if (client && staff) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "JWT must not combine the CLIENT role with a staff role.");
+        }
+        return client ? requireClientId() : requireSubjectId();
+    }
+
+    public static UUID requireClientId() {
+        Object claim = requireJwt().getClaim("clientId");
+        if (claim == null || claim.toString().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "JWT claim 'clientId' is missing.");
+        }
+        try {
+            return UUID.fromString(claim.toString());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "JWT claim 'clientId' is malformed.");
+        }
+    }
+
+    private static UUID requireSubjectId() {
         String subject = requireJwt().getSubject();
         if (subject == null || subject.isBlank()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "JWT subject 'sub' is missing.");
@@ -41,6 +68,11 @@ public final class TenantContext {
         } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "JWT subject 'sub' is malformed.");
         }
+    }
+
+    private static boolean hasAuthority(String authority) {
+        return requireJwtAuthentication().getAuthorities().stream()
+                .anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     public static Jwt requireJwt() {

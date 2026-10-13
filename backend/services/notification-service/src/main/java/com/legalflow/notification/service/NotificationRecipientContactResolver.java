@@ -41,7 +41,7 @@ public class NotificationRecipientContactResolver {
     }
 
     private ClientContact findClientContact(Jwt jwt) {
-        UUID clientId = TenantContext.requireRecipientId();
+        UUID clientId = TenantContext.requireClientId();
         try {
             ClientContact contact = clientServiceRestClient.get()
                     .uri("/clients/{clientId}", clientId)

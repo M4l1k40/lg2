@@ -46,6 +46,8 @@ class NotificationControllerTenantIsolationTest {
     private static final UUID FIRM_B = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID USER_A = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID USER_B = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID CLIENT_A = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID CLIENT_B = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
     private static final UUID NOTIFICATION_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 10, 1, 12, 0);
 
@@ -332,6 +334,81 @@ class NotificationControllerTenantIsolationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void clientListsNotificationsByClientIdNotBySub() throws Exception {
+        when(notificationRepository.findAllByLawFirmIdAndRecipientIdOrderByCreatedAtDesc(FIRM_A, CLIENT_A))
+                .thenReturn(List.of(notification(NOTIFICATION_ID, FIRM_A, CLIENT_A, false)));
+
+        mockMvc.perform(get("/notifications").with(jwtForClient(USER_A, CLIENT_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].recipientId").value(CLIENT_A.toString()));
+
+        verify(notificationRepository)
+                .findAllByLawFirmIdAndRecipientIdOrderByCreatedAtDesc(FIRM_A, CLIENT_A);
+        verify(notificationRepository, never())
+                .findAllByLawFirmIdAndRecipientIdOrderByCreatedAtDesc(FIRM_A, USER_A);
+    }
+
+    @Test
+    void clientCannotReadAnotherClientsNotification() throws Exception {
+        when(notificationRepository.findByIdAndLawFirmIdAndRecipientId(NOTIFICATION_ID, FIRM_A, CLIENT_B))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/notifications/{id}", NOTIFICATION_ID).with(jwtForClient(USER_B, CLIENT_B)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/notifications/{id}/read", NOTIFICATION_ID).with(jwtForClient(USER_B, CLIENT_B)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void clientWithoutClientIdClaimIsForbidden() throws Exception {
+        mockMvc.perform(get("/notifications").with(jwtForClient(USER_A, null)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(patch("/notifications/read-all").with(jwtForClient(USER_A, null)))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verifyNoInteractions(notificationRepository);
+    }
+
+    @Test
+    void clientWithMalformedClientIdClaimIsForbidden() throws Exception {
+        mockMvc.perform(get("/notifications").with(jwtForClient(USER_A, "not-a-uuid")))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verifyNoInteractions(notificationRepository);
+    }
+
+    @Test
+    void staffStillUsesSubEvenWhenTokenCarriesAClientIdClaim() throws Exception {
+        when(notificationRepository.findAllByLawFirmIdAndRecipientIdOrderByCreatedAtDesc(FIRM_A, USER_A))
+                .thenReturn(List.of(notification(NOTIFICATION_ID, FIRM_A, USER_A, false)));
+
+        mockMvc.perform(get("/notifications").with(jwt()
+                        .authorities(new SimpleGrantedAuthority("ROLE_LAWYER"))
+                        .jwt(token -> token.subject(USER_A.toString())
+                                .claim("lawFirmId", FIRM_A.toString())
+                                .claim("clientId", CLIENT_A.toString())
+                                .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].recipientId").value(USER_A.toString()));
+
+        verify(notificationRepository, never())
+                .findAllByLawFirmIdAndRecipientIdOrderByCreatedAtDesc(FIRM_A, CLIENT_A);
+    }
+
+    @Test
+    void tokenMixingClientAndStaffRolesIsForbidden() throws Exception {
+        mockMvc.perform(get("/notifications").with(jwt()
+                        .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"),
+                                new SimpleGrantedAuthority("ROLE_LAWYER"))
+                        .jwt(token -> token.subject(USER_A.toString())
+                                .claim("lawFirmId", FIRM_A.toString())
+                                .claim("clientId", CLIENT_A.toString()))))
+                .andExpect(status().isForbidden());
+
+        org.mockito.Mockito.verifyNoInteractions(notificationRepository);
+    }
+
     private Notification notification(UUID id, UUID lawFirmId, UUID recipientId, boolean read) {
         Notification notification = new Notification(lawFirmId, recipientId, NotificationType.DEADLINE_CREATED,
                 "Deadline created", "A deadline was created.", "DEADLINE", UUID.randomUUID());
@@ -356,5 +433,16 @@ class NotificationControllerTenantIsolationTest {
     private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForBInFirmA() {
                 return jwt().authorities(new SimpleGrantedAuthority("ROLE_LAWYER")).jwt(token -> token.subject(USER_B.toString()).claim("lawFirmId", FIRM_A.toString())
                                 .claim("realm_access", java.util.Map.of("roles", List.of("LAWYER"))));
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor jwtForClient(UUID sub, Object clientId) {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_CLIENT")).jwt(token -> {
+            token.subject(sub.toString())
+                    .claim("lawFirmId", FIRM_A.toString())
+                    .claim("realm_access", java.util.Map.of("roles", List.of("CLIENT")));
+            if (clientId != null) {
+                token.claim("clientId", clientId.toString());
+            }
+        });
     }
 }

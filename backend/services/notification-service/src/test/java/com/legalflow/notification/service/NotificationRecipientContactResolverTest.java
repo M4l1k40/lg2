@@ -31,6 +31,7 @@ class NotificationRecipientContactResolverTest {
     @Test
     void resolvesClientPhoneFromTenantScopedClientServiceUsingCallerToken() {
         UUID clientId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID keycloakSub = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         RestClient.Builder builder = RestClient.builder().baseUrl("http://client-service");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo("http://client-service/clients/" + clientId))
@@ -42,7 +43,8 @@ class NotificationRecipientContactResolverTest {
         NotificationRecipientContactResolver resolver = new NotificationRecipientContactResolver(builder.build());
         Jwt jwt = Jwt.withTokenValue("client-token")
                 .header("alg", "none")
-                .subject(clientId.toString())
+                .subject(keycloakSub.toString())
+                .claim("clientId", clientId.toString())
                 .claim("lawFirmId", "11111111-1111-1111-1111-111111111111")
                 .claim("realm_access", Map.of("roles", List.of("CLIENT")))
                 .build();
@@ -50,6 +52,7 @@ class NotificationRecipientContactResolverTest {
 
         NotificationRecipientContact contact = resolver.resolve(NotificationRecipientType.CLIENT);
 
+        // L'appel à client-service doit utiliser le clientId du JWT, jamais le sub Keycloak.
         assertEquals("Client A", contact.name());
         assertEquals("client@example.test", contact.email());
         assertEquals("+15550100", contact.phone());
