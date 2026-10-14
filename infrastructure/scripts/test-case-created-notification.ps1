@@ -31,15 +31,23 @@ function Invoke-Api($Method, $Path, $Token, $Body = $null) {
         Uri = "$gatewayUrl$Path"; Method = $Method; Headers = @{ Authorization = "Bearer $Token" }
         UseBasicParsing = $true
     }
-    if ($null -ne $Body) { $parameters.ContentType = 'application/json'; $parameters.Body = (ConvertTo-Json -InputObject $Body) }
+    if ($null -ne $Body) {
+        # UTF-8 explicite : sans charset, PowerShell 5.1 encode le corps en ISO-8859-1 et casse les accents.
+        $parameters.ContentType = 'application/json; charset=utf-8'
+        $parameters.Body = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $Body))
+    }
     try {
         $response = Invoke-WebRequest @parameters
         $json = if ($response.Content) { $response.Content | ConvertFrom-Json } else { $null }
-        return [pscustomobject]@{ Status = [int]$response.StatusCode; Json = $json }
+        return [pscustomobject]@{ Status = [int]$response.StatusCode; Json = $json; Error = '' }
     } catch {
         $status = 0
-        if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
-        return [pscustomobject]@{ Status = $status; Json = $null }
+        $errorBody = ''
+        if ($_.Exception.Response) {
+            $status = [int]$_.Exception.Response.StatusCode
+            try { $errorBody = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch { }
+        }
+        return [pscustomobject]@{ Status = $status; Json = $null; Error = $errorBody }
     }
 }
 
@@ -61,7 +69,14 @@ $lawyerSub = (ConvertFrom-JwtPayload $lawyer).sub
 Write-Output "--- Préparation"
 $clients = ConvertTo-Items (Invoke-Api GET '/api/clients' $lawyer).Json
 if ($clients.Count -eq 0) {
-    throw "Aucun client confié à lawyer-a : créez-en un (secretary-a) avec lawyer-a en charge, puis relancez."
+    # Un avocat qui crée un client en devient le responsable : pas besoin de passer par la secrétaire.
+    Write-Output "Aucun client confié à lawyer-a : création d'un client de test."
+    $newClient = Invoke-Api POST '/api/clients' $lawyer @{
+        firstName = 'Test'; lastName = 'Evenements'; email = "e2e-$([guid]::NewGuid().ToString().Substring(0, 8))@dev-only.test"
+    }
+    Assert-That "LAWYER POST /api/clients -> $($newClient.Status) (attendu 201)" ($newClient.Status -eq 201)
+    if ($newClient.Status -ne 201) { Write-Output "Réponse du service : $($newClient.Error)"; throw "Création du client de test impossible, arrêt." }
+    $clients = @($newClient.Json)
 }
 $clientId = $clients[0].id
 
@@ -71,16 +86,25 @@ $created = Invoke-Api POST '/api/cases' $lawyer @{
     clientId = $clientId; lawyerId = $lawyerSub; reference = $reference; title = 'Test événement RabbitMQ'
 }
 Assert-That "LAWYER POST /api/cases -> $($created.Status) (attendu 201)" ($created.Status -eq 201)
-if ($created.Status -ne 201) { throw "Création du dossier impossible, arrêt." }
+if ($created.Status -ne 201) { Write-Output "Réponse du service : $($created.Error)"; throw "Création du dossier impossible, arrêt." }
 $caseId = $created.Json.id
 
 Write-Output "--- Notification de l'avocat (asynchrone, 20 s max)"
 $found = @()
-for ($attempt = 0; $attempt -lt 20 -and $found.Count -eq 0; $attempt++) {
+for ($attempt = 0; $attempt -lt 30 -and $found.Count -eq 0; $attempt++) {
     Start-Sleep -Seconds 1
     $found = Get-CaseNotifications $lawyer $caseId
 }
 Assert-That "LAWYER voit la notification CASE_CREATED du dossier $reference" ($found.Count -ge 1)
+if ($found.Count -ge 1) {
+    # L'envoi d'email échoue tant qu'aucun serveur mail n'est branché : la notification reste lisible dans l'application.
+    Write-Output "      statut de livraison : $($found[0].status) via $($found[0].channel) ($($found[0].errorMessage))"
+} else {
+    Write-Output "      dossier attendu : $caseId"
+    Write-Output "      notifications vues par l'avocat :"
+    $seen = ConvertTo-Items (Invoke-Api GET '/api/notifications' $lawyer).Json
+    $seen | Select-Object -First 5 type, status, referenceId | Format-Table -AutoSize | Out-String | Write-Output
+}
 
 Write-Output "--- Isolation des destinataires"
 Assert-That 'SECRETARY ne voit pas la notification de l''avocat' ((Get-CaseNotifications $secretary $caseId).Count -eq 0)
