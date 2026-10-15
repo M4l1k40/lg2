@@ -90,15 +90,17 @@ if ($created.Status -ne 201) { Write-Output "Réponse du service : $($created.Er
 $caseId = $created.Json.id
 
 Write-Output "--- Notification de l'avocat (asynchrone, 20 s max)"
+# @() à chaque appel : une fonction qui renvoie un seul résultat le livre sans tableau, et .Count devient peu fiable.
 $found = @()
 for ($attempt = 0; $attempt -lt 30 -and $found.Count -eq 0; $attempt++) {
     Start-Sleep -Seconds 1
-    $found = Get-CaseNotifications $lawyer $caseId
+    $found = @(Get-CaseNotifications $lawyer $caseId)
 }
 Assert-That "LAWYER voit la notification CASE_CREATED du dossier $reference" ($found.Count -ge 1)
 if ($found.Count -ge 1) {
-    # L'envoi d'email échoue tant qu'aucun serveur mail n'est branché : la notification reste lisible dans l'application.
+    # Si l'envoi d'email échoue, la notification reste lisible dans l'application (statut FAILED).
     Write-Output "      statut de livraison : $($found[0].status) via $($found[0].channel) ($($found[0].errorMessage))"
+    Assert-That 'Email livré au serveur mail de développement (statut SENT, visible sur http://localhost:8025)' ($found[0].status -eq 'SENT')
 } else {
     Write-Output "      dossier attendu : $caseId"
     Write-Output "      notifications vues par l'avocat :"
@@ -107,10 +109,10 @@ if ($found.Count -ge 1) {
 }
 
 Write-Output "--- Isolation des destinataires"
-Assert-That 'SECRETARY ne voit pas la notification de l''avocat' ((Get-CaseNotifications $secretary $caseId).Count -eq 0)
+Assert-That 'SECRETARY ne voit pas la notification de l''avocat' (@(Get-CaseNotifications $secretary $caseId).Count -eq 0)
 $clientResponse = Invoke-Api GET '/api/notifications' $client
 Assert-That "CLIENT GET /api/notifications -> $($clientResponse.Status) (attendu 200, lecture par clientId)" ($clientResponse.Status -eq 200)
-Assert-That 'CLIENT ne voit pas la notification de l''avocat' ((Get-CaseNotifications $client $caseId).Count -eq 0)
+Assert-That 'CLIENT ne voit pas la notification de l''avocat' (@(Get-CaseNotifications $client $caseId).Count -eq 0)
 
 if ($script:failures -gt 0) { Write-Output "`n$($script:failures) échec(s)."; exit 1 }
 Write-Output "`nTous les contrôles sont passés."

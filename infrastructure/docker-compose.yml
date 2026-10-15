@@ -444,6 +444,8 @@ services:
         condition: service_started
       keycloak:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://notification-db:5432/notification_db
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
@@ -452,10 +454,10 @@ services:
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/legalflow/protocol/openid-connect/certs
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/legalflow
       CLIENT_SERVICE_URL: http://client-service:8081
-      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
       MAIL_PORT: ${MAIL_PORT:-1025}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-dev}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-dev}
       MAIL_FROM: ${MAIL_FROM:-no-reply@legalflow.local}
       WHATSAPP_MODE: ${WHATSAPP_MODE:-MOCK}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-META}
@@ -464,6 +466,18 @@ services:
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
     ports:
       - "8087:8087"
+    restart: unless-stopped
+
+  # Serveur mail de DÉVELOPPEMENT : capture les emails du notification-service, n'envoie rien dehors.
+  # Interface web : http://localhost:8025 (limitée à la machine locale). Le port SMTP 1025 reste interne.
+  mailpit:
+    image: axllent/mailpit:v1.30.5
+    container_name: legalflow-mailpit
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:8025:8025"
     restart: unless-stopped
 
 volumes:
