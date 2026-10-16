@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: legalflow-consultation-service
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:legalflow}
+    password: ${RABBITMQ_DEFAULT_PASS:replace-with-rabbitmq-password}
+    connection-timeout: 2s
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5439/consultation_db}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
@@ -27,3 +37,6 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    rabbit:
+      enabled: false

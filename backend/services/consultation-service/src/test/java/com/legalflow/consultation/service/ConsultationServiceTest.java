@@ -7,6 +7,7 @@ import com.legalflow.consultation.dto.AssignConsultationRequest;
 import com.legalflow.consultation.dto.CreateConsultationRequest;
 import com.legalflow.consultation.dto.UpdateConsultationRequest;
 import com.legalflow.consultation.integration.ClientServiceOwnershipVerifier;
+import com.legalflow.consultation.messaging.ConsultationEventPublisher;
 import com.legalflow.consultation.repository.ConsultationRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,13 +47,15 @@ class ConsultationServiceTest {
 
     private ConsultationRepository repository;
     private ClientServiceOwnershipVerifier verifier;
+    private ConsultationEventPublisher publisher;
     private ConsultationService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(ConsultationRepository.class);
         verifier = mock(ClientServiceOwnershipVerifier.class);
-        service = new ConsultationService(repository, verifier);
+        publisher = mock(ConsultationEventPublisher.class);
+        service = new ConsultationService(repository, verifier, publisher);
         when(repository.save(any(Consultation.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -249,6 +253,59 @@ class ConsultationServiceTest {
         ResponseStatusException delete = assertThrows(ResponseStatusException.class,
                 () -> service.deleteConsultation(CONSULTATION_ID));
         assertEquals(HttpStatus.FORBIDDEN, delete.getStatusCode());
+    }
+
+    @Test
+    void creatingAConsultationPublishesCreated() {
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+
+        Consultation result = service.createConsultation(createRequest(null), null);
+
+        verify(publisher).created(result);
+    }
+
+    @Test
+    void eachSuccessfulTransitionPublishesItsEvent() {
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        AssignConsultationRequest assign = new AssignConsultationRequest();
+        assign.setLawyerId(LAWYER_ID);
+        verify(publisher, never()).assigned(any(Consultation.class));
+        service.assignConsultation(CONSULTATION_ID, assign);
+        verify(publisher).assigned(any(Consultation.class));
+
+        authenticate(LAWYER_ID, null, "LAWYER");
+        service.startConsultation(CONSULTATION_ID);
+        AnswerConsultationRequest answer = new AnswerConsultationRequest();
+        answer.setAnswer("Voici ma réponse détaillée.");
+        service.answerConsultation(CONSULTATION_ID, answer);
+        verify(publisher).answered(any(Consultation.class));
+
+        service.closeConsultation(CONSULTATION_ID);
+        verify(publisher).closed(any(Consultation.class));
+    }
+
+    @Test
+    void cancellingAndDeletingPublishCancelledButARejectedCancelDoesNot() {
+        authenticate(LAWYER_ID, null, "LAWYER");
+        stub(consultation(CLIENT_ID, LAWYER_ID, ConsultationStatus.ASSIGNED));
+        assertThrows(ResponseStatusException.class, () -> service.cancelConsultation(CONSULTATION_ID));
+        verify(publisher, never()).cancelled(any(Consultation.class));
+
+        authenticate(UUID.randomUUID(), CLIENT_ID, "CLIENT");
+        service.cancelConsultation(CONSULTATION_ID);
+        verify(publisher).cancelled(any(Consultation.class));
+    }
+
+    @Test
+    void deletingAConsultationPublishesCancelled() {
+        authenticate(SECRETARY_ID, null, "SECRETARY");
+        stub(consultation(CLIENT_ID, null, ConsultationStatus.PENDING));
+
+        service.deleteConsultation(CONSULTATION_ID);
+
+        verify(publisher).cancelled(any(Consultation.class));
     }
 
     private void stub(Consultation consultation) {

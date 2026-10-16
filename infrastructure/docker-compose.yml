@@ -347,6 +347,8 @@ services:
     build:
       context: ../backend/services/consultation-service
       dockerfile: Dockerfile
+      additional_contexts:
+        events: ./legalflow-events
     container_name: legalflow-consultation-service
     depends_on:
       consultation-db:

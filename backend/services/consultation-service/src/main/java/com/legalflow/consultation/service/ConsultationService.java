@@ -7,6 +7,7 @@ import com.legalflow.consultation.dto.AssignConsultationRequest;
 import com.legalflow.consultation.dto.CreateConsultationRequest;
 import com.legalflow.consultation.dto.UpdateConsultationRequest;
 import com.legalflow.consultation.integration.ClientServiceOwnershipVerifier;
+import com.legalflow.consultation.messaging.ConsultationEventPublisher;
 import com.legalflow.consultation.repository.ConsultationRepository;
 import com.legalflow.consultation.security.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -36,11 +37,14 @@ public class ConsultationService {
 
     private final ConsultationRepository consultationRepository;
     private final ClientServiceOwnershipVerifier clientServiceOwnershipVerifier;
+    private final ConsultationEventPublisher consultationEventPublisher;
 
     public ConsultationService(ConsultationRepository consultationRepository,
-                              ClientServiceOwnershipVerifier clientServiceOwnershipVerifier) {
+                              ClientServiceOwnershipVerifier clientServiceOwnershipVerifier,
+                              ConsultationEventPublisher consultationEventPublisher) {
         this.consultationRepository = consultationRepository;
         this.clientServiceOwnershipVerifier = clientServiceOwnershipVerifier;
+        this.consultationEventPublisher = consultationEventPublisher;
     }
 
     /**
@@ -99,7 +103,9 @@ public class ConsultationService {
                 ConsultationStatus.PENDING,
                 null
         );
-        return consultationRepository.save(consultation);
+        Consultation saved = consultationRepository.save(consultation);
+        consultationEventPublisher.created(saved);
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -148,7 +154,9 @@ public class ConsultationService {
         }
         consultation.setLawyerId(request.getLawyerId());
         consultation.setStatus(ConsultationStatus.ASSIGNED);
-        return consultationRepository.save(consultation);
+        Consultation saved = consultationRepository.save(consultation);
+        consultationEventPublisher.assigned(saved);
+        return saved;
     }
 
     @Transactional
@@ -171,7 +179,9 @@ public class ConsultationService {
         consultation.setAnswer(request.getAnswer().trim());
         consultation.setAnsweredAt(LocalDateTime.now());
         consultation.setStatus(ConsultationStatus.ANSWERED);
-        return consultationRepository.save(consultation);
+        Consultation saved = consultationRepository.save(consultation);
+        consultationEventPublisher.answered(saved);
+        return saved;
     }
 
     @Transactional
@@ -183,7 +193,9 @@ public class ConsultationService {
         ensureTransitionAllowed(consultation, ConsultationStatus.CLOSED, "close");
         consultation.setStatus(ConsultationStatus.CLOSED);
         consultation.setClosedAt(LocalDateTime.now());
-        return consultationRepository.save(consultation);
+        Consultation saved = consultationRepository.save(consultation);
+        consultationEventPublisher.closed(saved);
+        return saved;
     }
 
     @Transactional
@@ -192,7 +204,9 @@ public class ConsultationService {
         rejectLawyerOnly("cancel");
         ensureTransitionAllowed(consultation, ConsultationStatus.CANCELLED, "cancel");
         consultation.setStatus(ConsultationStatus.CANCELLED);
-        return consultationRepository.save(consultation);
+        Consultation saved = consultationRepository.save(consultation);
+        consultationEventPublisher.cancelled(saved);
+        return saved;
     }
 
     @Transactional
@@ -205,7 +219,7 @@ public class ConsultationService {
                     "Consultation is already " + consultation.getStatus() + ".");
         }
         consultation.setStatus(ConsultationStatus.CANCELLED);
-        consultationRepository.save(consultation);
+        consultationEventPublisher.cancelled(consultationRepository.save(consultation));
     }
 
     private void rejectMismatchedTenant(UUID requestedLawFirmId, UUID authenticatedLawFirmId) {
