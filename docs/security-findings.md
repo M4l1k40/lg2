@@ -17,12 +17,12 @@ Registre tenu pendant le développement : chaque point est décrit, classé, pui
 | SEC-06 | Aucun moyen de créer les comptes d'un cabinet (comptes créés à la main dans Keycloak) ; l'assignation d'une consultation demandait un UUID d'avocat saisi à la main. | Moyenne | `user-service` (annuaire des avocats, création de comptes, `lawFirmId` forcé depuis le token) | `test-user-service.ps1` |
 | SEC-20 | **Cloisonnement des avocats absent** : un avocat voyait tous les clients, dossiers, factures, échéances, documents et affaires judiciaires du cabinet (le RBAC ne contrôlait que le rôle, pas la propriété des données). Découvert en testant un compte avocat créé par l'administrateur. | Élevée | Clients : liste d'avocats en charge (`client_lawyers`). Dossiers : visibles par l'avocat assigné. Factures, échéances, documents, judiciaire : visibles si le `case-service` accepte le dossier. Un avocat n'ouvre un dossier que pour lui-même, et l'administration ne peut assigner qu'un avocat en charge du client. | `test-lawyer-scope.ps1` |
 | SEC-07 | Notifications : le destinataire était le `sub` Keycloak alors que les événements visent un `clientId` ; les clients ne recevaient jamais leurs notifications. | Moyenne | Convention : `recipientId` = `clientId` (claim du JWT) pour le rôle CLIENT, `sub` pour le personnel ; JWT sans `clientId` ou mêlant CLIENT et rôle du personnel → `403` | tests `NotificationControllerTenantIsolationTest` |
+| SEC-08 | Keycloak en mode `dev-file` sans volume : utilisateurs, clients et réglages perdus à chaque recréation du conteneur (constaté deux fois). | Moyenne | Volume nommé `legalflow_keycloak_data` sur `/opt/keycloak/data`. Effet de bord : `legalflow-realm.json` n'est plus réimporté une fois le realm créé | `docker compose up -d --force-recreate keycloak` puis connexion des comptes de test |
 
 ## 2. Points ouverts (non corrigés volontairement, à traiter plus tard)
 
 | ID | Point | Gravité | À traiter avec |
 |---|---|---|---|
-| SEC-08 | Keycloak en mode `dev-file` sans volume : utilisateurs et réglages perdus à chaque recréation du conteneur. | Moyenne | Étape 8 — industrialisation |
 | SEC-09 | Email des clients unique **globalement** (`unique` + `existsByEmail`) : un cabinet peut deviner qu'un email existe chez un autre (erreur `409`). | Moyenne | Migration Flyway (unicité par cabinet) |
 | SEC-10 | Tribunaux et juges sans `lawFirmId` : partagés et modifiables entre cabinets par tout avocat ou administrateur. | Élevée | Migration Flyway (données propres à chaque cabinet) |
 | SEC-11 | Documents : `storageKey` fournie par l'appelant, aucun upload réel. Risque latent : une clé forgée pourrait viser le fichier d'un autre cabinet. | Moyenne | Étape 7 — documents réels (clé générée par le serveur) |

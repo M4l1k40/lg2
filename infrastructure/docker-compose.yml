@@ -50,6 +50,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      # Données Keycloak (base dev-file) persistées : une recréation du conteneur ne perd plus les comptes.
+      # Une fois le realm créé, legalflow-realm.json n'est plus réimporté : pour repartir de zéro,
+      # `docker compose rm -sf keycloak` puis `docker volume rm infrastructure_legalflow_keycloak_data`.
+      - legalflow_keycloak_data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import
     healthcheck:
       test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080; echo -e \"GET /realms/legalflow/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; grep -q \"\"issuer\"\" <&3' || exit 1"]
@@ -485,6 +489,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  legalflow_keycloak_data:
   legalflow_rabbitmq_data:
   legalflow_postgres_data:
   legalflow_case_postgres_data:
