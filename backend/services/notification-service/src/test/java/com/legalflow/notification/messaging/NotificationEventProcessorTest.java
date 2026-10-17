@@ -10,6 +10,7 @@ import com.legalflow.notification.repository.NotificationRepository;
 import com.legalflow.notification.repository.ProcessedEventRepository;
 import com.legalflow.notification.service.NotificationDeliveryException;
 import com.legalflow.notification.service.NotificationProvider;
+import com.legalflow.notification.service.NotificationRecipientContact;
 import com.legalflow.notification.service.NotificationRoutingService;
 import com.legalflow.notification.service.NotificationRecipientContact;
 import com.legalflow.notification.service.WhatsAppNotificationProvider;
@@ -50,7 +51,9 @@ class NotificationEventProcessorTest {
                 mapper,
                 notificationRepository,
                 processedEventRepository,
-                routingService
+                routingService,
+                (recipient, firmId) -> new NotificationRecipientContact(
+                        recipient.name(), recipient.email(), recipient.phone())
         );
 
         UUID lawFirmId = UUID.fromString("11111111-1111-1111-1111-111111111111");

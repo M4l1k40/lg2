@@ -9,7 +9,7 @@ import com.legalflow.notification.domain.ProcessedEvent;
 import com.legalflow.notification.repository.NotificationRepository;
 import com.legalflow.notification.repository.ProcessedEventRepository;
 import com.legalflow.notification.service.NotificationDeliveryException;
-import com.legalflow.notification.service.NotificationRecipientContact;
+import com.legalflow.notification.service.RecipientContactDirectory;
 import com.legalflow.notification.service.NotificationRoutingService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -23,15 +23,18 @@ public class NotificationEventProcessor {
     private final NotificationRepository notificationRepository;
     private final ProcessedEventRepository processedEventRepository;
     private final NotificationRoutingService notificationRoutingService;
+    private final RecipientContactDirectory recipientContactDirectory;
 
     public NotificationEventProcessor(NotificationEventMapper eventMapper,
                                      NotificationRepository notificationRepository,
                                      ProcessedEventRepository processedEventRepository,
-                                     NotificationRoutingService notificationRoutingService) {
+                                     NotificationRoutingService notificationRoutingService,
+                                     RecipientContactDirectory recipientContactDirectory) {
         this.eventMapper = eventMapper;
         this.notificationRepository = notificationRepository;
         this.processedEventRepository = processedEventRepository;
         this.notificationRoutingService = notificationRoutingService;
+        this.recipientContactDirectory = recipientContactDirectory;
     }
 
     @Transactional
@@ -68,7 +71,7 @@ public class NotificationEventProcessor {
             notification = notificationRepository.saveAndFlush(notification);
             try {
                 notificationRoutingService.send(notification,
-                        new NotificationRecipientContact(recipient.name(), recipient.email(), recipient.phone()));
+                        recipientContactDirectory.contactFor(recipient, event.lawFirmId()));
                 notification.markSent(LocalDateTime.now());
             } catch (NotificationDeliveryException exception) {
                 notification.markFailed(exception.getMessage());

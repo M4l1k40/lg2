@@ -80,3 +80,12 @@ notifications:
     api-url: ${WHATSAPP_API_URL:https://graph.facebook.com/v22.0}
     access-token: ${WHATSAPP_ACCESS_TOKEN:}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+
+# Compte de service (client_credentials) pour retrouver les coordonnées d'un client absent de l'événement.
+# Le secret n'est jamais committé : variable d'environnement NOTIFICATION_SERVICE_CLIENT_SECRET.
+legalflow:
+  service-account:
+    keycloak-url: ${KEYCLOAK_URL:http://keycloak:8080}
+    realm: ${KEYCLOAK_REALM:legalflow}
+    client-id: ${NOTIFICATION_SERVICE_CLIENT_ID:legalflow-notification-service}
+    client-secret: ${NOTIFICATION_SERVICE_CLIENT_SECRET:}

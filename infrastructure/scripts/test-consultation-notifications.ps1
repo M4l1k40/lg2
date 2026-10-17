@@ -109,6 +109,7 @@ $answered = Wait-Notification $client 'CONSULTATION_ANSWERED' $id
 Assert-That 'CLIENT reçoit CONSULTATION_ANSWERED' ($null -ne $answered)
 if ($null -ne $answered) {
     Write-Output "      livraison : $($answered.status) via $($answered.channel) ($($answered.errorMessage))"
+    Assert-That 'les coordonnées du client ont été retrouvées par le notification-service (statut SENT)' ($answered.status -eq 'SENT')
     Assert-That 'le message ne contient pas la réponse de l''avocat' (-not ($answered.message -like '*confidentielle*'))
 }
 Step-Api 'LAWYER PUT close' PUT "/api/consultations/$id/close" $lawyer 200 | Out-Null

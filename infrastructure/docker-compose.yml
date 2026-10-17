@@ -461,6 +461,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-dev}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-dev}
       MAIL_FROM: ${MAIL_FROM:-no-reply@legalflow.local}
+      # Secret de DÉVELOPPEMENT : en production, le fournir par variable d'environnement ou secret Docker.
+      NOTIFICATION_SERVICE_CLIENT_SECRET: ${NOTIFICATION_SERVICE_CLIENT_SECRET:-dev-only-notification-service-secret}
       WHATSAPP_MODE: ${WHATSAPP_MODE:-MOCK}
       WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-META}
       WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://graph.facebook.com/v22.0}
