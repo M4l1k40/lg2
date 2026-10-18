@@ -21,6 +21,7 @@ import OfficeConsultationsPage from './pages/secretary/OfficeConsultationsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import SecretaryDashboardPage from './pages/secretary/SecretaryDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 export default function App() {
   return (
@@ -42,7 +43,7 @@ export default function App() {
                 <Route path="judicial" element={<PlaceholderPage titleKey="client.nav.judicial" />} />
                 <Route path="payments" element={<PlaceholderPage titleKey="client.nav.payments" />} />
                 <Route path="appointments" element={<PlaceholderPage titleKey="client.nav.appointments" />} />
-                <Route path="notifications" element={<PlaceholderPage titleKey="client.nav.notifications" />} />
+                <Route path="notifications" element={<NotificationsPage />} />
               </Route>
             </Route>
 
@@ -57,7 +58,7 @@ export default function App() {
                 <Route path="appointments" element={<PlaceholderPage titleKey="lawyer.nav.appointments" />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="lawyer.nav.documents" />} />
                 <Route path="consultations" element={<LawyerConsultationsPage />} />
-                <Route path="notifications" element={<PlaceholderPage titleKey="lawyer.nav.notifications" />} />
+                <Route path="notifications" element={<NotificationsPage />} />
               </Route>
             </Route>
 
@@ -72,7 +73,7 @@ export default function App() {
                 <Route path="appointments" element={<PlaceholderPage titleKey="secretary.nav.appointments" />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="secretary.nav.documents" />} />
                 <Route path="payments" element={<PlaceholderPage titleKey="secretary.nav.payments" />} />
-                <Route path="notifications" element={<PlaceholderPage titleKey="secretary.nav.notifications" />} />
+                <Route path="notifications" element={<NotificationsPage />} />
               </Route>
             </Route>
 

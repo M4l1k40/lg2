@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import SidebarNav from '../components/common/SidebarNav';
+import NotificationBell from '../components/notifications/NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -41,6 +42,7 @@ export default function ClientLayout() {
                 <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 md:block">
                   {t.common.search}
                 </div>
+                <NotificationBell to="/client/notifications" />
                 <button
                   type="button"
                   onClick={() => setLanguage(language === 'fr' ? 'ar' : 'fr')}
