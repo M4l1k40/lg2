@@ -98,6 +98,79 @@ public class KeycloakAdminClient {
         return Optional.ofNullable(user);
     }
 
+    /** Compte lié à une fiche client (attribut clientId), s'il existe. */
+    public Optional<KeycloakUser> findUserByClientId(UUID clientId) {
+        List<KeycloakUser> users = call(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/admin/realms/{realm}/users")
+                        .queryParam("q", "clientId:" + clientId)
+                        .queryParam("max", 2)
+                        .queryParam("briefRepresentation", false)
+                        .build(properties.realm()))
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .retrieve()
+                .body(USER_LIST));
+        return users == null || users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
+    /** Compte dont l'adresse email est exactement celle donnée (tous cabinets confondus). */
+    public Optional<KeycloakUser> findUserByEmail(String email) {
+        List<KeycloakUser> users = call(() -> restClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/admin/realms/{realm}/users")
+                        .queryParam("email", email)
+                        .queryParam("exact", true)
+                        .queryParam("max", 2)
+                        .queryParam("briefRepresentation", false)
+                        .build(properties.realm()))
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .retrieve()
+                .body(USER_LIST));
+        return users == null || users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
+    /** Crée un compte SANS mot de passe : l'utilisateur le choisira lui-même via le lien d'invitation. */
+    public String createInvitedUser(String username, String email, String firstName, String lastName,
+                                    Map<String, List<String>> attributes) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("username", username);
+        body.put("email", email);
+        body.put("firstName", firstName);
+        body.put("lastName", lastName);
+        body.put("enabled", true);
+        body.put("emailVerified", true);
+        body.put("attributes", attributes);
+
+        ResponseEntity<Void> response = call(() -> restClient.post()
+                .uri("/admin/realms/{realm}/users", properties.realm())
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity());
+
+        URI location = response == null ? null : response.getHeaders().getLocation();
+        if (location == null || location.getPath() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak did not return the created user id.");
+        }
+        String path = location.getPath();
+        return path.substring(path.lastIndexOf('/') + 1);
+    }
+
+    /** Demande à Keycloak d'envoyer à l'utilisateur un email contenant un lien (à durée limitée) vers les actions données. */
+    public void sendActionsEmail(String userId, List<String> actions, int lifespanSeconds,
+                                 String clientId, String redirectUri) {
+        call(() -> restClient.put()
+                .uri(uriBuilder -> uriBuilder.path("/admin/realms/{realm}/users/{id}/execute-actions-email")
+                        .queryParam("lifespan", lifespanSeconds)
+                        .queryParam("client_id", clientId)
+                        .queryParam("redirect_uri", redirectUri)
+                        .build(properties.realm(), userId))
+                .header(HttpHeaders.AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(actions)
+                .retrieve()
+                .toBodilessEntity());
+    }
+
     /** Crée un utilisateur avec un mot de passe temporaire (changement obligatoire à la première connexion). */
     public String createUser(String username, String email, String firstName, String lastName,
                              Map<String, List<String>> attributes, String temporaryPassword) {

@@ -120,6 +120,33 @@ export default function LawyerClientsPage() {
     setSubmitError(null);
   }
 
+  function describeInviteError(error) {
+    if (error.status === 409) {
+      return error.message?.includes('disabled')
+        ? "Le compte de ce client est désactivé : réactivez-le dans « Utilisateurs » avant de l'inviter."
+        : 'Un compte existe déjà avec cet email.';
+    }
+    if (error.status === 422) {
+      return error.message?.includes('email')
+        ? "Ce client n'a pas d'adresse email : impossible de l'inviter."
+        : 'Client introuvable dans votre cabinet.';
+    }
+    if (error.status === 403) return "Vous n'avez pas le droit d'inviter ce client.";
+    if (error.status >= 500) {
+      return "L'invitation n'a pas pu être envoyée (serveur d'authentification ou messagerie indisponible).";
+    }
+    return error.message || "L'invitation a échoué.";
+  }
+
+  function inviteClient(client) {
+    return run(
+      `invite-${client.id}`,
+      () => api.post(`/api/users/clients/${client.id}/invitation`),
+      `Invitation envoyée à ${client.email} : le client choisira son mot de passe via le lien reçu (valable 72 h).`,
+      describeInviteError
+    );
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
@@ -165,7 +192,7 @@ export default function LawyerClientsPage() {
     }
   }
 
-  const columnCount = isOffice ? 7 : 5;
+  const columnCount = isOffice ? 8 : 6;
 
   return (
     <div className="space-y-6">
@@ -321,6 +348,7 @@ export default function LawyerClientsPage() {
                   {isOffice ? <th className="py-2 pr-4 font-medium">Avocat(s) en charge</th> : null}
                   <th className="py-2 pr-4 font-medium">Adresse</th>
                   <th className="py-2 pr-4 font-medium">Créé le</th>
+                  <th className="py-2 pr-4 font-medium">Accès</th>
                   {isOffice ? <th className="py-2 font-medium">Actions</th> : null}
                 </tr>
               </thead>
@@ -345,6 +373,17 @@ export default function LawyerClientsPage() {
                       ) : null}
                       <td className="py-3 pr-4 text-slate-600">{client.address || '—'}</td>
                       <td className="py-3 pr-4 text-slate-600">{formatDate(client.createdAt)}</td>
+                      <td className="py-3 pr-4">
+                        <button
+                          type="button"
+                          className={secondaryButton}
+                          title="Envoie un email avec un lien pour choisir son mot de passe. Peut être renvoyé."
+                          disabled={busyKey === `invite-${client.id}`}
+                          onClick={() => inviteClient(client)}
+                        >
+                          {busyKey === `invite-${client.id}` ? 'Envoi…' : 'Inviter'}
+                        </button>
+                      </td>
                       {isOffice ? (
                         <td className="py-3">
                           <button
