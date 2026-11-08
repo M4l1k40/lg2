@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -190,6 +191,20 @@ jobs:
             user-service.tags=infrastructure-user-service
             user-service.cache-from=type=gha,scope=legalflow-user-service
             user-service.cache-to=type=gha,scope=legalflow-user-service,mode=max,ignore-error=true
+
+            # Correct Docker Bake contexts relative to repository root
+            appointment-service.context=./backend/services/appointment-service
+            billing-service.context=./backend/services/billing-service
+            case-service.context=./backend/services/case-service
+            client-service.context=./backend/services/client-service
+            consultation-service.context=./backend/services/consultation-service
+            deadline-service.context=./backend/services/deadline-service
+            document-service.context=./backend/services/document-service
+            gateway.context=./backend/gateway
+            judicial-service.context=./backend/services/judicial-service
+            notification-service.context=./backend/services/notification-service
+            user-service.context=./backend/services/user-service
+
       - name: Start Docker Compose stack
         run: docker compose -p infrastructure -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.user-service.yml up -d
       - name: Wait for services to become ready
