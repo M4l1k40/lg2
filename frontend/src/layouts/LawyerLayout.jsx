@@ -10,6 +10,7 @@ const lawyerNav = [
   { to: '/lawyer/cases', labelKey: 'lawyer.nav.cases', label: 'Dossiers' },
   { to: '/lawyer/judicial', labelKey: 'lawyer.nav.judicial', label: 'Judiciaire' },
   { to: '/lawyer/deadlines', labelKey: 'lawyer.nav.deadlines', label: 'Échéances' },
+  { to: '/lawyer/invoices', labelKey: 'lawyer.nav.invoices', label: 'Factures' },
   { to: '/lawyer/appointments', labelKey: 'lawyer.nav.appointments', label: 'Rendez-vous' },
   { to: '/lawyer/documents', labelKey: 'lawyer.nav.documents', label: 'Documents' },
   { to: '/lawyer/consultations', labelKey: 'lawyer.nav.consultations', label: 'Consultations' },
