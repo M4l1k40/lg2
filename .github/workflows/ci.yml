@@ -137,12 +137,22 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Include the security scans in the required CI result.
+  security:
+    uses: ./.github/workflows/security.yml
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+
   # Provide one required branch-protection check for the complete CI workflow.
   ci-ok:
     needs:
       - shared-library
       - backend
       - frontend
+      - security
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -151,9 +161,10 @@ jobs:
           SHARED_LIBRARY_RESULT: ${{ needs.shared-library.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
         run: |
-          if [[ "$SHARED_LIBRARY_RESULT" != "success" || "$BACKEND_RESULT" != "success" || "$FRONTEND_RESULT" != "success" ]]; then
-            echo "CI did not succeed: shared-library=$SHARED_LIBRARY_RESULT, backend=$BACKEND_RESULT, frontend=$FRONTEND_RESULT"
+          if [[ "$SHARED_LIBRARY_RESULT" != "success" || "$BACKEND_RESULT" != "success" || "$FRONTEND_RESULT" != "success" || "$SECURITY_RESULT" != "success" ]]; then
+            echo "CI did not succeed: shared-library=$SHARED_LIBRARY_RESULT, backend=$BACKEND_RESULT, frontend=$FRONTEND_RESULT, security=$SECURITY_RESULT"
             exit 1
           fi
           echo "All CI jobs succeeded."
