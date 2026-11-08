@@ -3,6 +3,7 @@ package com.legalflow.document.service;
 import com.legalflow.document.domain.Document;
 import com.legalflow.document.domain.DocumentVisibility;
 import com.legalflow.document.dto.DocumentRequest;
+import com.legalflow.document.dto.DocumentStatsResponse;
 import com.legalflow.document.integration.CaseServiceOwnershipVerifier;
 import com.legalflow.document.repository.DocumentRepository;
 import com.legalflow.document.security.TenantContext;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,6 +91,30 @@ public class DocumentService {
             return uploader || TenantContext.hasRole("ADMIN");
         }
         return true;
+    }
+
+    /**
+     * Comptage pour les tableaux de bord. Seuls les documents que l'appelant a le droit de voir sont comptés
+     * (mêmes règles de visibilité que la lecture) : un total ne doit pas révéler l'existence de documents
+     * réservés. Les bornes sont des instants fournis par le navigateur (minuit local, il y a 7 jours).
+     */
+    @Transactional(readOnly = true)
+    public DocumentStatsResponse getStats(Instant weekStart, Instant todayStart) {
+        UUID lawFirmId = TenantContext.requireLawFirmId();
+        List<Document> visible = documentRepository.findAllByLawFirmIdOrderByCreatedAtDesc(lawFirmId).stream()
+                .filter(this::isVisibleByRole)
+                .toList();
+        // createdAt est un LocalDateTime enregistré dans le fuseau de la JVM : on convertit les bornes dans le même fuseau.
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDateTime week = LocalDateTime.ofInstant(weekStart, zone);
+        LocalDateTime today = LocalDateTime.ofInstant(todayStart, zone);
+        return new DocumentStatsResponse(visible.size(), createdSince(visible, week), createdSince(visible, today));
+    }
+
+    private static long createdSince(List<Document> documents, LocalDateTime since) {
+        return documents.stream()
+                .filter(document -> document.getCreatedAt() != null && !document.getCreatedAt().isBefore(since))
+                .count();
     }
 
     @Transactional

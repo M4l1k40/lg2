@@ -22,6 +22,10 @@ import AdminUsersPage from './pages/admin/AdminUsersPage';
 import SecretaryDashboardPage from './pages/secretary/SecretaryDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import NotificationsPage from './pages/NotificationsPage';
+import LawyerAppointmentsPage from './pages/lawyer/LawyerAppointmentsPage';
+import LawyerDeadlinesPage from './pages/lawyer/LawyerDeadlinesPage';
+import LawyerInvoicesPage from './pages/lawyer/LawyerInvoicesPage';
+import LawyerJudicialPage from './pages/lawyer/LawyerJudicialPage';
 
 export default function App() {
   return (
@@ -53,9 +57,10 @@ export default function App() {
                 <Route path="dashboard" element={<LawyerDashboardPage />} />
                 <Route path="clients" element={<LawyerClientsPage />} />
                 <Route path="cases" element={<LawyerCasesPage />} />
-                <Route path="judicial" element={<PlaceholderPage titleKey="lawyer.nav.judicial" />} />
-                <Route path="deadlines" element={<PlaceholderPage titleKey="lawyer.nav.deadlines" />} />
-                <Route path="appointments" element={<PlaceholderPage titleKey="lawyer.nav.appointments" />} />
+                <Route path="judicial" element={<LawyerJudicialPage />} />
+                <Route path="deadlines" element={<LawyerDeadlinesPage />} />
+                <Route path="invoices" element={<LawyerInvoicesPage />} />
+                <Route path="appointments" element={<LawyerAppointmentsPage />} />
                 <Route path="documents" element={<PlaceholderPage titleKey="lawyer.nav.documents" />} />
                 <Route path="consultations" element={<LawyerConsultationsPage />} />
                 <Route path="notifications" element={<NotificationsPage />} />

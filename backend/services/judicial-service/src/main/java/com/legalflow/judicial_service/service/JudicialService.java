@@ -172,6 +172,8 @@ public class JudicialService {
         if (!tenantId.equals(judicialCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + id);
         }
+        // Un avocat ne modifie que les procédures des dossiers qu'il peut voir (comme pour la lecture).
+        requireVisible(judicialCase, id);
 
         JudicialCaseStatus current = judicialCase.getStatus();
         if (current == null) {
@@ -223,6 +225,11 @@ public class JudicialService {
         if (!tenantId.equals(judicialCase.getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Judicial case not found: " + judicialCaseId);
         }
+        requireVisible(judicialCase, judicialCaseId);
+        if (judicialCase.getStatus() == JudicialCaseStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "A hearing cannot be scheduled on a closed judicial case.");
+        }
         Hearing hearing = new Hearing(judicialCase, request.getDateTime(), request.getType(), request.getStatus(),
                 request.getLocation(), request.getNotes(), request.getNextAction());
         hearing.setJudicialCase(judicialCase);
@@ -232,7 +239,10 @@ public class JudicialService {
         }
 
         Hearing saved = hearingRepository.save(hearing);
-        judicialCase.setStatus(JudicialCaseStatus.HEARING_SCHEDULED);
+        // Le statut n'avance que si la transition est autorisée : une procédure en délibéré ne « recule » pas.
+        if (isValidStatusTransition(judicialCase.getStatus(), JudicialCaseStatus.HEARING_SCHEDULED)) {
+            judicialCase.setStatus(JudicialCaseStatus.HEARING_SCHEDULED);
+        }
 
         JudicialEvent event = new JudicialEvent("HEARING_CREATED",
                 "Hearing scheduled for " + saved.getDateTime() + " type=" + saved.getType(),
@@ -250,6 +260,7 @@ public class JudicialService {
         if (!tenantId.equals(hearing.getJudicialCase().getLawFirmId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Hearing not found: " + hearingId);
         }
+        requireVisible(hearing.getJudicialCase(), hearing.getJudicialCase().getId());
 
         HearingStatus current = hearing.getStatus();
         if (!isValidHearingStatusTransition(current, newStatus)) {
@@ -266,7 +277,10 @@ public class JudicialService {
         hearing.getJudicialCase().addEvent(event);
         judicialCaseRepository.save(hearing.getJudicialCase());
 
-        if (newStatus == HearingStatus.COMPLETED) {
+        // Terminer une audience met la procédure en délibéré seulement si cette transition est autorisée :
+        // une procédure déjà jugée ou close ne doit pas être rouverte par un simple changement d'audience.
+        if (newStatus == HearingStatus.COMPLETED
+                && isValidStatusTransition(hearing.getJudicialCase().getStatus(), JudicialCaseStatus.DELIBERATION)) {
             hearing.getJudicialCase().setStatus(JudicialCaseStatus.DELIBERATION);
             judicialCaseRepository.save(hearing.getJudicialCase());
         }

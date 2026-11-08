@@ -95,4 +95,12 @@ public class Appointment {
     public String getNotes() { return notes; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setStatus(AppointmentStatus status) { this.status = status; }
+
+    /** Modification d'un rendez-vous : seuls la date, le type, le lieu et les notes peuvent changer. */
+    public void reschedule(LocalDateTime dateTime, AppointmentType type, String location, String notes) {
+        this.dateTime = dateTime;
+        this.type = type;
+        this.location = location;
+        this.notes = notes;
+    }
 }

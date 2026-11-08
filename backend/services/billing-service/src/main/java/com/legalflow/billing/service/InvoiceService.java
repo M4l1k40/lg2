@@ -117,6 +117,11 @@ public class InvoiceService {
         rejectMismatchedTenant(request.getLawFirmId(), lawFirmId);
 
         Invoice invoice = getInvoice(id);
+        // Une facture payée ou annulée est une pièce comptable figée : on ne change plus son montant ni son numéro.
+        if (invoice.getStatus() == InvoiceStatus.PAID || invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "A paid or cancelled invoice can no longer be modified (current status: " + invoice.getStatus() + ").");
+        }
         caseServiceOwnershipVerifier.verifyCaseBelongsToCurrentTenant(request.getCaseId());
 
         if (!invoice.getInvoiceNumber().equals(request.getInvoiceNumber())

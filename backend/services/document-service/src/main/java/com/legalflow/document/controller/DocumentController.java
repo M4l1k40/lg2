@@ -3,6 +3,7 @@ package com.legalflow.document.controller;
 import org.springframework.security.access.prepost.PreAuthorize;
 import com.legalflow.document.domain.Document;
 import com.legalflow.document.dto.DocumentRequest;
+import com.legalflow.document.dto.DocumentStatsResponse;
 import com.legalflow.document.service.DocumentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -13,9 +14,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +37,13 @@ public class DocumentController {
     @PreAuthorize("hasAnyRole('ADMIN','SECRETARY','LAWYER')")
     public Document createDocument(@Valid @RequestBody DocumentRequest request) {
         return documentService.createDocument(request);
+    }
+
+    /** Comptage pour les tableaux de bord du personnel de bureau (le CLIENT et l'avocat n'en ont pas l'usage). */
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ADMIN','SECRETARY')")
+    public DocumentStatsResponse getStats(@RequestParam Instant weekStart, @RequestParam Instant todayStart) {
+        return documentService.getStats(weekStart, todayStart);
     }
 
     @GetMapping("/{id}")

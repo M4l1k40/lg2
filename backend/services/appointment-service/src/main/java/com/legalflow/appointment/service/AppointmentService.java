@@ -4,6 +4,7 @@ import com.legalflow.appointment.domain.Appointment;
 import com.legalflow.appointment.domain.AppointmentStatus;
 import com.legalflow.appointment.dto.AppointmentRequest;
 import com.legalflow.appointment.dto.AppointmentResponse;
+import com.legalflow.appointment.dto.AppointmentUpdateRequest;
 import com.legalflow.appointment.integration.AppointmentOwnershipVerifier;
 import com.legalflow.appointment.repository.AppointmentRepository;
 import com.legalflow.appointment.security.TenantContext;
@@ -97,6 +98,24 @@ public class AppointmentService {
     @Transactional(readOnly = true)
     public AppointmentResponse getById(UUID id) {
         return AppointmentResponse.from(findOwnedAppointment(id));
+    }
+
+    /**
+     * Modifie un rendez-vous encore planifié. Un avocat ne peut modifier que les siens (le rendez-vous d'un autre
+     * est introuvable : 404) ; le personnel de bureau peut modifier ceux du cabinet.
+     */
+    @Transactional
+    public AppointmentResponse update(UUID id, AppointmentUpdateRequest request) {
+        Appointment appointment = findOwnedAppointment(id);
+        if (!TenantContext.isStaff()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only staff can modify an appointment.");
+        }
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only a scheduled appointment can be modified (current status: " + appointment.getStatus() + ").");
+        }
+        appointment.reschedule(request.getDateTime(), request.getType(), request.getLocation(), request.getNotes());
+        return AppointmentResponse.from(appointmentRepository.saveAndFlush(appointment));
     }
 
     @Transactional
