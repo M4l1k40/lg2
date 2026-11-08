@@ -151,6 +151,7 @@ jobs:
       - name: Build Docker images
         uses: docker/bake-action@v7.5.0
         with:
+          source: .
           files: |
             infrastructure/docker-compose.yml
             infrastructure/docker-compose.user-service.yml
