@@ -1,0 +1,609 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      production-minor-and-patch:
+        dependency-type: production
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      development-minor-and-patch:
+        dependency-type: development
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: maven
+    directory: /infrastructure/legalflow-events
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/gateway
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/appointment-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/billing-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/case-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/client-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/consultation-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/deadline-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/document-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/judicial-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/notification-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: maven
+    directory: /backend/services/user-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/gateway
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/appointment-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/billing-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/case-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/client-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/consultation-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/deadline-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/document-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/judicial-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/notification-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: docker
+    directory: /backend/services/user-service
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: maven
+        update-types:
+          - version-update:semver-major
+      - dependency-name: eclipse-temurin
+        update-types:
+          - version-update:semver-major
