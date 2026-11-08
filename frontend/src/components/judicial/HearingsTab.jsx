@@ -15,12 +15,13 @@ const GROUPS = [
   { key: 'toHandle', label: 'À traiter', empty: 'Aucune audience à traiter (passée non clôturée ou reportée).' },
   { key: 'history', label: 'Historique', empty: 'Aucune audience terminée ou annulée.' }
 ];
+const EMPTY_ARRAY = [];
 
 export default function HearingsTab({ judicialCases, details, casesById, canWrite, action, onHearingStatus, now }) {
   const [group, setGroup] = useState('upcoming');
   const { busyKey } = action;
 
-  const list = judicialCases.ok && Array.isArray(judicialCases.value) ? judicialCases.value : [];
+  const list = judicialCases.ok && Array.isArray(judicialCases.value) ? judicialCases.value : EMPTY_ARRAY;
   const hearingsByCase = useMemo(
     () => Object.fromEntries(Object.entries(details).map(([id, value]) => [id, value.hearings])),
     [details]
