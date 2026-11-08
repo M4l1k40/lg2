@@ -60,13 +60,14 @@ function Invoke-Api {
     }
     catch {
         $response = $_.Exception.Response
+        $content = $_.ErrorDetails.Message
+        if ([string]::IsNullOrWhiteSpace($content)) { $content = $_.Exception.Message }
         if ($null -eq $response) {
-            return [pscustomobject]@{ StatusCode = 0; Content = $_.Exception.Message }
+            return [pscustomobject]@{ StatusCode = 0; Content = $content }
         }
-        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
         return [pscustomobject]@{
             StatusCode = [int]$response.StatusCode
-            Content = $reader.ReadToEnd()
+            Content = $content
         }
     }
 }

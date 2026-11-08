@@ -12,6 +12,7 @@ permissions:
 jobs:
   # Analyze Java/Kotlin and JavaScript/TypeScript with CodeQL.
   codeql:
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
