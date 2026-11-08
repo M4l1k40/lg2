@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Verify the shared event library independently.
+  shared-library:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify shared library
+        working-directory: infrastructure/legalflow-events
+        run: mvn -B verify
+
+  # Verify each independently built backend module.
+  backend:
+    needs: shared-library
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: gateway
+            path: backend/gateway
+          - module: appointment-service
+            path: backend/services/appointment-service
+          - module: billing-service
+            path: backend/services/billing-service
+          - module: case-service
+            path: backend/services/case-service
+          - module: client-service
+            path: backend/services/client-service
+          - module: consultation-service
+            path: backend/services/consultation-service
+          - module: deadline-service
+            path: backend/services/deadline-service
+          - module: document-service
+            path: backend/services/document-service
+          - module: judicial-service
+            path: backend/services/judicial-service
+          - module: notification-service
+            path: backend/services/notification-service
+          - module: user-service
+            path: backend/services/user-service
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+      - name: Install shared library for dependent modules
+        if: contains(fromJSON('["case-service","consultation-service","notification-service"]'), matrix.module)
+        working-directory: infrastructure/legalflow-events
+        run: mvn -B install -DskipTests
+      - name: Verify backend module
+        working-directory: ${{ matrix.path }}
+        run: mvn -B verify
+      - name: Summarize Surefire tests
+        if: always()
+        working-directory: ${{ matrix.path }}
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          reports = sorted(Path("target/surefire-reports").glob("TEST-*.xml"))
+          totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          failed_tests = []
+
+          for report in reports:
+              root = ET.parse(report).getroot()
+              for key in totals:
+                  totals[key] += int(root.attrib.get(key, 0))
+              for case in root.iter("testcase"):
+                  if case.find("failure") is not None or case.find("error") is not None:
+                      failed_tests.append(f'{case.attrib.get("classname", "")}#{case.attrib.get("name", "unknown")}')
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as output:
+              output.write(f'### {os.environ["MODULE"]} test results\n\n')
+              if not reports:
+                  output.write("No Surefire XML reports were produced.\n")
+              output.write(
+                  f'- Tests: {totals["tests"]}; failures: {totals["failures"]}; '
+                  f'errors: {totals["errors"]}; skipped: {totals["skipped"]}\n'
+              )
+              output.write("- Failed tests: " + (", ".join(failed_tests) if failed_tests else "none") + "\n")
+          PY
+      - name: Upload Surefire reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-${{ matrix.module }}
+          path: ${{ matrix.path }}/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Test and build the frontend.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  # Provide one required branch-protection check for the complete CI workflow.
+  ci-ok:
+    needs:
+      - shared-library
+      - backend
+      - frontend
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check prerequisite job results
+        env:
+          SHARED_LIBRARY_RESULT: ${{ needs.shared-library.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+        run: |
+          if [[ "$SHARED_LIBRARY_RESULT" != "success" || "$BACKEND_RESULT" != "success" || "$FRONTEND_RESULT" != "success" ]]; then
+            echo "CI did not succeed: shared-library=$SHARED_LIBRARY_RESULT, backend=$BACKEND_RESULT, frontend=$FRONTEND_RESULT"
+            exit 1
+          fi
+          echo "All CI jobs succeeded."
