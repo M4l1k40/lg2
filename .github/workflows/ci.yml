@@ -192,7 +192,6 @@ jobs:
             user-service.cache-from=type=gha,scope=legalflow-user-service
             user-service.cache-to=type=gha,scope=legalflow-user-service,mode=max,ignore-error=true
 
-            # Correct Docker Bake contexts relative to repository root
             appointment-service.context=./backend/services/appointment-service
             billing-service.context=./backend/services/billing-service
             case-service.context=./backend/services/case-service
