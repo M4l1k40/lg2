@@ -114,7 +114,7 @@ Write-Output "--- 4. Modification"
 $edit = @{ caseId = $caseId; title = 'Conclusions déposées'; description = 'Modifiée'; dueDate = $inTenDays; priority = 'URGENT' }
 $updated = Invoke-Api PUT "/api/deadlines/$id" $lawyer $edit
 Assert-Status 'LAWYER modifie son échéance' $updated 200
-Assert-That 'intitulé, priorité et date modifiés' ($updated.Json.title -eq 'Conclusions déposées' -and $updated.Json.priority -eq 'URGENT' -and $updated.Json.dueDate.StartsWith($inTenDays.Substring(0, 16)))
+Assert-That 'intitulé, priorité et date modifiés' ($updated.Json.title -eq 'Conclusions déposées' -and $updated.Json.priority -eq 'URGENT' -and (([datetime]$updated.Json.dueDate).ToString("yyyy-MM-dd'T'HH:mm", [Globalization.CultureInfo]::InvariantCulture) -eq $inTenDays.Substring(0, 16)))
 Assert-Status 'un autre avocat ne peut pas la modifier (404)' (Invoke-Api PUT "/api/deadlines/$id" $lawyerSameFirm $edit) 404
 Assert-Status 'un avocat d''un autre cabinet ne peut pas la modifier (404)' (Invoke-Api PUT "/api/deadlines/$id" $lawyerOtherFirm $edit) 404
 Assert-Status 'SECRETARY ne peut pas modifier (403)' (Invoke-Api PUT "/api/deadlines/$id" $secretary $edit) 403
