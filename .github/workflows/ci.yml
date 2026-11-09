@@ -275,6 +275,7 @@ jobs:
           pwsh -NoLogo -NoProfile -File infrastructure/scripts/configure-keycloak-user-profile.ps1
           pwsh -NoLogo -NoProfile -File infrastructure/scripts/configure-keycloak-user-service.ps1
           pwsh -NoLogo -NoProfile -File infrastructure/scripts/configure-keycloak-realm-email.ps1
+          pwsh -NoLogo -NoProfile -File infrastructure/scripts/configure-keycloak-notification-service.ps1
           pwsh -NoLogo -NoProfile -File infrastructure/scripts/seed-keycloak-users.ps1
       - name: Run integration scripts
         shell: bash

@@ -132,7 +132,7 @@ $updated = Invoke-Api PUT "/api/invoices/$id" $lawyer $edit
 Assert-Status 'LAWYER modifie sa facture' $updated 200
 Assert-That 'description et montant modifiés' ($updated.Json.description -eq 'Honoraires modifiés' -and [decimal]$updated.Json.amount -eq 1300.00)
 Assert-Status 'un autre avocat ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerSameFirm $edit) 404
-Assert-Status 'un avocat d''un autre cabinet ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerOtherFirm $edit) 404
+Assert-Status 'un avocat d''un autre cabinet ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerOtherFirm @{ description = $edit.description; amount = $edit.amount; invoiceNumber = $edit.invoiceNumber; caseId = $edit.caseId; clientId = $edit.clientId; dueDate = $edit.dueDate }) 404
 Assert-Status 'SECRETARY ne peut pas modifier (403)' (Invoke-Api PUT "/api/invoices/$id" $secretary $edit) 403
 Assert-Status 'CLIENT ne peut pas modifier (403)' (Invoke-Api PUT "/api/invoices/$id" $client $edit) 403
 

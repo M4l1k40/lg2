@@ -213,7 +213,7 @@ services:
     volumes:
       - legalflow_document_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U document_user -d document_db"]
+      test: ["CMD", "pg_isready", "-U", "document_user", "-d", "document_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -255,7 +255,7 @@ services:
     volumes:
       - legalflow_deadline_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U deadline_user -d deadline_db"]
+      test: ["CMD", "pg_isready", "-U", "deadline_user", "-d", "deadline_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -299,7 +299,7 @@ services:
     volumes:
       - legalflow_billing_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U billing_user -d billing_db"]
+      test: ["CMD", "pg_isready", "-U", "billing_user", "-d", "billing_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -342,7 +342,7 @@ services:
     volumes:
       - legalflow_consultation_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U consultation_user -d consultation_db"]
+      test: ["CMD", "pg_isready", "-U", "consultation_user", "-d", "consultation_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -386,7 +386,7 @@ services:
     volumes:
       - legalflow_appointment_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appointment_user -d appointment_db"]
+      test: ["CMD", "pg_isready", "-U", "appointment_user", "-d", "appointment_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -431,7 +431,7 @@ services:
     volumes:
       - legalflow_notification_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notification_user -d notification_db"]
+      test: ["CMD", "pg_isready", "-U", "notification_user", "-d", "notification_db"]
       interval: 10s
       timeout: 5s
       retries: 5
