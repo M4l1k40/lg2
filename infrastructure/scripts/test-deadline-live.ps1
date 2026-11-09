@@ -51,10 +51,11 @@ function Invoke-LiveApi {
             $result = [pscustomobject]@{ StatusCode = 0; Content = $_.Exception.Message }
         }
         else {
-            $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
+            $content = $_.ErrorDetails.Message
+            if ([string]::IsNullOrWhiteSpace($content)) { $content = $_.Exception.Message }
             $result = [pscustomobject]@{
                 StatusCode = [int]$response.StatusCode
-                Content = $reader.ReadToEnd()
+                Content = $content
             }
         }
     }

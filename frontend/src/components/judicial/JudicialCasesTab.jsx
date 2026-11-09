@@ -34,6 +34,8 @@ import {
   validateJudicialCase
 } from '../../utils/judicial';
 
+const EMPTY_ARRAY = [];
+
 export default function JudicialCasesTab({
   judicialCases, details, courts, cases, canWrite, lawFirmId, action, onChanged, onCaseStatus, onHearingStatus, now
 }) {
@@ -46,9 +48,9 @@ export default function JudicialCasesTab({
   const [hearingForm, setHearingForm] = useState(emptyHearingForm());
   const [hearingErrors, setHearingErrors] = useState({});
 
-  const list = judicialCases.ok && Array.isArray(judicialCases.value) ? judicialCases.value : [];
-  const courtList = courts.ok && Array.isArray(courts.value) ? courts.value : [];
-  const caseList = cases.ok && Array.isArray(cases.value) ? cases.value : [];
+  const list = judicialCases.ok && Array.isArray(judicialCases.value) ? judicialCases.value : EMPTY_ARRAY;
+  const courtList = courts.ok && Array.isArray(courts.value) ? courts.value : EMPTY_ARRAY;
+  const caseList = cases.ok && Array.isArray(cases.value) ? cases.value : EMPTY_ARRAY;
   const casesById = useMemo(() => new Map(caseList.map((item) => [item.id, item])), [caseList]);
   const courtsById = useMemo(() => new Map(courtList.map((item) => [item.id, item])), [courtList]);
   const judgesById = useMemo(

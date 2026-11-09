@@ -51,8 +51,8 @@ function Invoke-ObservedRequest {
             $result = [pscustomobject]@{ StatusCode = 0; Content = $_.Exception.Message }
         }
         else {
-            $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
-            $result = [pscustomobject]@{ StatusCode = [int]$response.StatusCode; Content = $reader.ReadToEnd() }
+            $errorBody = if ($response -is [System.Net.Http.HttpResponseMessage]) { [string]$_.ErrorDetails.Message } else { [System.IO.StreamReader]::new($response.GetResponseStream()).ReadToEnd() }
+            $result = [pscustomobject]@{ StatusCode = [int]$response.StatusCode; Content = $errorBody }
         }
     }
     Write-Host "HTTP $Name $($result.StatusCode)"

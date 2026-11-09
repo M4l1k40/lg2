@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 $keycloakUrl = 'http://localhost:8080'
 $realm = 'legalflow'
@@ -76,7 +76,6 @@ $profileUri = "$keycloakUrl/admin/realms/$realm/users/profile"
 $profile = Invoke-RestMethod -Method Get -Uri $profileUri -Headers $headers
 $managedNames = @($claimScopes.Keys)
 $profile.attributes = @($profile.attributes | Where-Object { $_.name -notin $managedNames }) + @($profileConfig.attributes)
-
 Invoke-RestMethod -Method Put -Uri $profileUri -Headers $headers `
     -ContentType 'application/json' `
     -Body (ConvertTo-Json -InputObject $profile -Depth 20) | Out-Null

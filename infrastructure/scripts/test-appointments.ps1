@@ -103,7 +103,7 @@ Write-Output "--- 4. Modification"
 $edit = @{ dateTime = $later; type = 'COURT_HEARING'; location = 'Tribunal de commerce'; notes = 'Modifié' }
 $updated = Invoke-Api PUT "/api/appointments/$id" $lawyer $edit
 Assert-Status 'LAWYER modifie son rendez-vous' $updated 200
-Assert-That 'le lieu, le type et la date ont été modifiés' ($updated.Json.location -eq 'Tribunal de commerce' -and $updated.Json.type -eq 'COURT_HEARING' -and $updated.Json.dateTime.StartsWith($later.Substring(0, 16)))
+Assert-That 'le lieu, le type et la date ont été modifiés' ($updated.Json.location -eq 'Tribunal de commerce' -and $updated.Json.type -eq 'COURT_HEARING' -and (([datetime]$updated.Json.dateTime).ToString("yyyy-MM-dd'T'HH:mm", [Globalization.CultureInfo]::InvariantCulture) -eq $later.Substring(0, 16)))
 Assert-That 'le client et l''avocat n''ont pas changé' ($updated.Json.clientId -eq $clientId -and $updated.Json.lawyerId -eq $lawyerId)
 Assert-Status 'un autre avocat ne peut pas le modifier (404)' (Invoke-Api PUT "/api/appointments/$id" $lawyerSameFirm $edit) 404
 Assert-Status 'un avocat d''un autre cabinet ne peut pas le modifier (404)' (Invoke-Api PUT "/api/appointments/$id" $lawyerOtherFirm $edit) 404
