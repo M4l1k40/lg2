@@ -204,6 +204,10 @@ jobs:
             notification-service.context=./backend/services/notification-service
             user-service.context=./backend/services/user-service
 
+            case-service.contexts.events=./infrastructure/legalflow-events
+            consultation-service.contexts.events=./infrastructure/legalflow-events
+            notification-service.contexts.events=./infrastructure/legalflow-events
+
       - name: Start Docker Compose stack
         run: docker compose -p infrastructure -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.user-service.yml up -d
       - name: Wait for services to become ready
