@@ -354,8 +354,19 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
-          if [[ "$SHARED_LIBRARY_RESULT" != "success" || "$BACKEND_RESULT" != "success" || "$FRONTEND_RESULT" != "success" || ( "$INTEGRATION_RESULT" != "success" && "$INTEGRATION_RESULT" != "skipped" ) || "$SECURITY_RESULT" != "success" ]]; then
-            echo "CI did not succeed: shared-library=$SHARED_LIBRARY_RESULT, backend=$BACKEND_RESULT, frontend=$FRONTEND_RESULT, integration=$INTEGRATION_RESULT, security=$SECURITY_RESULT"
+          if [[ "$SHARED_LIBRARY_RESULT" != "success" ||
+                "$BACKEND_RESULT" != "success" ||
+                "$FRONTEND_RESULT" != "success" ||
+                ( "$INTEGRATION_RESULT" != "success" && "$INTEGRATION_RESULT" != "skipped" ) ||
+                "$SECURITY_RESULT" != "success" ]]; then
+
+            echo "CI did not succeed:"
+            echo "shared-library=$SHARED_LIBRARY_RESULT"
+            echo "backend=$BACKEND_RESULT"
+            echo "frontend=$FRONTEND_RESULT"
+            echo "integration=$INTEGRATION_RESULT"
+            echo "security=$SECURITY_RESULT"
             exit 1
           fi
+
           echo "All CI jobs succeeded."

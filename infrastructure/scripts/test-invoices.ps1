@@ -1,4 +1,4 @@
-﻿# Vérifie, à travers la gateway et avec chaque rôle, les factures : création, lecture, modification, statuts,
+# Vérifie, à travers la gateway et avec chaque rôle, les factures : création, lecture, modification, statuts,
 # gel des factures payées ou annulées, isolation (autre avocat, autre cabinet), droits (secrétaire, client)
 # et nettoyage. Prérequis : billing-service reconstruit avec la règle « facture figée », comptes de test présents.
 $ErrorActionPreference = 'Stop'
@@ -76,6 +76,8 @@ $lawyerClaims = ConvertFrom-JwtPayload $lawyer
 $lawyerId = $lawyerClaims.sub
 $lawFirmId = $lawyerClaims.lawFirmId
 $clientClaimId = (ConvertFrom-JwtPayload $client).clientId
+$lawyerOtherFirmClaims = ConvertFrom-JwtPayload $lawyerOtherFirm
+$otherLawFirmId = $lawyerOtherFirmClaims.lawFirmId
 
 $cases = @((Invoke-Api GET '/api/cases' $lawyer).Json | ForEach-Object { $_ })
 if ($cases.Count -eq 0) {
@@ -132,7 +134,7 @@ $updated = Invoke-Api PUT "/api/invoices/$id" $lawyer $edit
 Assert-Status 'LAWYER modifie sa facture' $updated 200
 Assert-That 'description et montant modifiés' ($updated.Json.description -eq 'Honoraires modifiés' -and [decimal]$updated.Json.amount -eq 1300.00)
 Assert-Status 'un autre avocat ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerSameFirm $edit) 404
-Assert-Status 'un avocat d''un autre cabinet ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerOtherFirm @{ description = $edit.description; amount = $edit.amount; invoiceNumber = $edit.invoiceNumber; caseId = $edit.caseId; clientId = $edit.clientId; dueDate = $edit.dueDate }) 404
+Assert-Status 'un avocat d''un autre cabinet ne peut pas la modifier (404)' (Invoke-Api PUT "/api/invoices/$id" $lawyerOtherFirm (Merge-Hash $edit @{ lawFirmId = $otherLawFirmId })) 404
 Assert-Status 'SECRETARY ne peut pas modifier (403)' (Invoke-Api PUT "/api/invoices/$id" $secretary $edit) 403
 Assert-Status 'CLIENT ne peut pas modifier (403)' (Invoke-Api PUT "/api/invoices/$id" $client $edit) 403
 
