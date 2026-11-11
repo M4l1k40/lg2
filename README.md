@@ -95,9 +95,6 @@ Principes clés :
     └── security-findings.md       # registre des failles et correctifs (SEC-xx)
 ```
 
-> Adaptez les noms de dossiers si votre arborescence diffère.
-
----
 
 ## Démarrage rapide
 
@@ -233,9 +230,3 @@ Pour signaler une vulnérabilité, contactez le mainteneur en privé plutôt que
 | Comptes de test disparus après recréation du conteneur Keycloak | Keycloak en `dev-file` sans volume | Monter un volume pour les données Keycloak |
 | Notification WhatsApp en `FAILED` | Numéro de téléphone absent sur la fiche client | Renseigner le téléphone du client |
 | Email en `FAILED` | Serveur SMTP non configuré | Vérifier Mailpit et la config SMTP du realm |
-
----
-
-## Auteur
-
-**Malika Elaantri** — [GitHub @M4l1k40](https://github.com/M4l1k40)
